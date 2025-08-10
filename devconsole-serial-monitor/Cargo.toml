@@ -1,0 +1,13 @@
+[package]
+name = "DevConsole-SerialMonitor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+env_logger = "0.11.8"
+log = "0.4.27"
+
+[dependencies.srobo_base]
+git = "https://github.com/nnctroboticsclub/srobo_base.git"
+features = ["std"]
+rev = "v1.0.6"

@@ -1,19 +1,7 @@
-[package]
-name = "DevConsole"
-version = "0.1.0"
-edition = "2024"
+[workspace]
 
-[dependencies]
-tungstenite = "0.27.0"
-env_logger = "0.11.8"
-log = "0.4.27"
-
-[dependencies.srobo_base]
-git = "https://github.com/nnctroboticsclub/srobo_base.git"
-features = ["std"]
-rev = "v1.0.6"
-
-
-[[bin]]
-name = "devconsole-serial"
-path = "src/serial-mon/main.rs"
+members = [
+    "devconsole-server",
+    "devconsole-protocol",
+    "devconsole-serial-monitor",
+]

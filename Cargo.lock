@@ -3,12 +3,24 @@
 version = 4
 
 [[package]]
-name = "DevConsole"
+name = "DevConsole-Protocol"
+version = "0.1.0"
+
+[[package]]
+name = "DevConsole-SerialMonitor"
 version = "0.1.0"
 dependencies = [
  "env_logger",
  "log",
  "srobo_base",
+]
+
+[[package]]
+name = "DevConsole-Server"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
  "tungstenite",
 ]
 
