@@ -7,6 +7,7 @@ mod serial_monitor;
 
 use std::sync::mpsc;
 use std::thread::spawn;
+use std::time::Duration;
 
 pub fn main() {
     // initialize the logger as debug level
@@ -21,19 +22,37 @@ pub fn main() {
         device_watcher::watcher_thread(tx);
     });
 
-    // Keep the main thread alive to allow the watcher to run
+    let (serial_tx, serial_rx) = mpsc::channel();
+
     loop {
-        let msg = rx.recv();
+        let msg = rx.recv_timeout(Duration::from_millis(1));
         match msg {
             Ok(device_watcher::Event::DeviceFound(device)) => {
-                info!("Device found: /dev/{}", device);
+                info!("Found serial device: {}", device);
+                let tx = serial_tx.clone();
+                spawn(move || {
+                    serial_monitor::monitor_thread(device, tx);
+                });
             }
-            Ok(device_watcher::Event::DeviceRemoved(device)) => {
-                info!("Device removed: /dev/{}", device);
-            }
+            Ok(device_watcher::Event::DeviceRemoved(device)) => (),
+            Err(mpsc::RecvTimeoutError::Timeout) => (),
             Err(e) => {
-                error!("Error receiving message: {}", e);
-                break; // Exit the loop on error
+                error!("Error receiving message from device watcher: {}", e);
+                break;
+            }
+        }
+
+        match serial_rx.recv_timeout(Duration::from_millis(1)) {
+            Ok(serial_monitor::Event::LineReceipt(path, line)) => {
+                info!("Received line from {}: {}", path, line);
+            }
+            Ok(serial_monitor::Event::Closed(path)) => {
+                info!("Serial device closed: {}", path);
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => (),
+            Err(e) => {
+                error!("Error receiving message from serial device: {}", e);
+                return;
             }
         }
     }

@@ -652,7 +652,7 @@ dependencies = [
 [[package]]
 name = "srobo_base"
 version = "0.1.0"
-source = "git+https://github.com/nnctroboticsclub/srobo_base.git#5bc7a4110a034ec88ff12e9ef836809abbb0f63d"
+source = "git+https://github.com/nnctroboticsclub/srobo_base.git?rev=v1.0.6#e5b64f4865a49b24640f25b13b57e70c976df247"
 dependencies = [
  "cbindgen",
  "serialport",

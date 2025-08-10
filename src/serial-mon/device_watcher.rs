@@ -31,15 +31,15 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
                 continue; // Already found this device
             }
             if fname.starts_with("ttyACM") || fname.starts_with("ttyUSB") {
-                debug!("Found serial device: /dev/{}", fname);
                 found_devices.push(fname.clone());
-                let _ = tx.send(Event::DeviceFound(fname.clone()));
+                let _ = tx.send(Event::DeviceFound(
+                    entry.path().to_string_lossy().to_string(),
+                ));
             }
         }
 
         for device in found_devices.clone() {
             if !fs::metadata(format!("/dev/{}", device)).is_ok() {
-                debug!("Device removed: /dev/{}", device);
                 let _ = tx.send(Event::DeviceRemoved(device.to_string()));
                 found_devices.retain(|d| d != &device);
             }

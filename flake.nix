@@ -17,10 +17,10 @@
           rustfmt
           rustc
 
-          chromedriver
+          chromium
         ];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-        PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromedriver}/bin/chromedriver";
+        PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
         PUPPETEER_BROWSER = "chrome";
       };
     };
