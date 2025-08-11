@@ -2,15 +2,11 @@
 extern crate log;
 extern crate env_logger as logger;
 
-mod device_watcher;
-mod serial_monitor;
-
 use std::sync::mpsc;
 use std::thread::spawn;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-
 
 #[tokio::main]
 pub async fn main() {

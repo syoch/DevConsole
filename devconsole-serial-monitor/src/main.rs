@@ -10,6 +10,7 @@ use std::thread::spawn;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tokio::time::sleep;
 
 #[derive(Debug, Serialize, Deserialize)]
 enum SerialEvent {
@@ -18,7 +19,7 @@ enum SerialEvent {
     Closed { path: String },
 }
 
-pub fn main() {
+pub fn main1() {
     // initialize the logger as debug level
     logger::Builder::new()
         .filter(None, log::LevelFilter::Debug)
@@ -63,5 +64,27 @@ pub fn main() {
                 return;
             }
         }
+    }
+}
+
+#[tokio::main]
+pub async fn main() {
+    logger::Builder::new()
+        .filter(None, log::LevelFilter::Debug)
+        .init();
+    let mut client = devconsole_client::DCClient::new("ws://127.0.0.1:9001")
+        .await
+        .unwrap();
+    let a = client
+        .open("my_channel".to_string())
+        .await
+        .expect("Failed to open channel");
+    info!("Opened channel: {:?}", a);
+
+    loop {
+        let b = client.send(a, "Hello, world!".to_string()).await;
+        info!("Sent message: {:?}", b);
+
+        sleep(Duration::from_secs(1)).await;
     }
 }

@@ -218,19 +218,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
-name = "devconsole-server"
-version = "0.1.0"
-dependencies = [
- "devconsole_protocol",
- "env_logger",
- "futures-util",
- "log",
- "serde_json",
- "tokio",
- "tokio-tungstenite",
-]
-
-[[package]]
 name = "devconsole_client"
 version = "0.1.0"
 dependencies = [
@@ -274,6 +261,19 @@ dependencies = [
  "serde_json",
  "srobo_base",
  "tokio",
+]
+
+[[package]]
+name = "devconsole_server"
+version = "0.1.0"
+dependencies = [
+ "devconsole_protocol",
+ "env_logger",
+ "futures-util",
+ "log",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]

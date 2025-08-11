@@ -28,11 +28,13 @@ impl SharedServer {
         self.0.lock().await.node_id_manager.get_new_id()
     }
 
-    pub async fn new_channel(&self, name: String, supplied_by: NodeID) {
+    pub async fn new_channel(&self, name: String, supplied_by: NodeID) -> ChannelID {
         let cid = self.0.lock().await.channel_id_manager.get_new_id();
 
-        let channel = Channel::new(cid, name, supplied_by);
+        let channel = Channel::new(cid.clone(), name, supplied_by);
         self.0.lock().await.channels.push(channel);
+
+        cid
     }
 
     pub async fn broadcast_data(&self, channel: ChannelID, data: String) {

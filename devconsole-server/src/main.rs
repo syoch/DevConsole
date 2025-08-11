@@ -57,7 +57,14 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
                     server.broadcast_data(channel, data).await;
                 }
                 Event::ChannelOpenRequest { name } => {
-                    server.new_channel(name, node_id).await;
+                    let channel = server.new_channel(name, node_id).await;
+                    client
+                        .send_event(Event::ChannelOpenResponse {
+                            channel,
+                            success: true,
+                        })
+                        .await
+                        .unwrap();
                 }
                 Event::ChannelListenRequest { channel } => {
                     let response = Event::ChannelListenResponse {

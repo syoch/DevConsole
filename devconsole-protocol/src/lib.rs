@@ -21,6 +21,11 @@ pub enum Event {
     ChannelOpenRequest {
         name: String,
     },
+    ChannelOpenResponse {
+        channel: ChannelID,
+        success: bool,
+    },
+
     ChannelCloseRequest {
         channel: ChannelID,
     },
