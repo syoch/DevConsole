@@ -54,7 +54,16 @@ impl SharedServer {
     }
 
     pub async fn remove_connection(&self, client: &SharedClient) {
+        let client_node_id = client.node_id().await;
+
         self.0.lock().await.connections.retain(|c| c != client);
+
+        // remove channels that are provided by this client
+        self.0
+            .lock()
+            .await
+            .channels
+            .retain(|c| c.supplied_by() != client_node_id);
     }
 
     pub async fn get_channel_ids(&self) -> Vec<ChannelID> {

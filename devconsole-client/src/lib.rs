@@ -60,6 +60,7 @@ impl From<&Event> for DispatchID {
 struct Dispatchers {
     events: HashMap<DispatchID, oneshot::Sender<bool>>,
     resolve_channel: Option<oneshot::Sender<ChannelID>>,
+    channel_list: Option<oneshot::Sender<Vec<ChannelID>>>,
 }
 
 struct SharedDispatchers(Arc<Mutex<Dispatchers>>);
@@ -123,6 +124,21 @@ impl SharedDispatchers {
             let _ = tx.send(channel);
         } else {
             warn!("No dispatcher found for channel resolution");
+        }
+    }
+
+    pub async fn wait_for_channel_list(&self) -> Vec<ChannelID> {
+        let (tx, rx) = oneshot::channel();
+        self.lock().await.channel_list = Some(tx);
+
+        rx.await.expect("Failed to receive channel list")
+    }
+
+    pub async fn dispatch_channel_list(&self, channels: Vec<ChannelID>) {
+        if let Some(tx) = self.lock().await.channel_list.take() {
+            let _ = tx.send(channels);
+        } else {
+            warn!("No dispatcher found for channel list");
         }
     }
 }
@@ -195,6 +211,15 @@ impl DCClient {
         Ok(channel)
     }
 
+    pub async fn channel_list(&mut self) -> Result<Vec<ChannelID>, DCClientError> {
+        self.send_evt(Event::ChannelListRequest)
+            .await
+            .map_err(DCClientError::WSError)?;
+
+        let channels = self.dispatches.wait_for_channel_list().await;
+        Ok(channels)
+    }
+
     async fn send_evt(
         &mut self,
         event: Event,
@@ -229,7 +254,10 @@ impl DCClient {
                             .dispatch_event(DispatchID::Listen(channel), success)
                             .await;
                     }
-                    // Event::ChannelListResponse { channels } => {}
+                    Event::ChannelListResponse { channels } => {
+                        info!("Received channel list: {:?}", channels);
+                        dispatchers.dispatch_channel_list(channels).await;
+                    }
                     // Event::ChannelInfoResponse {
                     //     channel,
                     //     name,

@@ -33,6 +33,10 @@ impl SharedClient {
         })))
     }
 
+    pub async fn node_id(&self) -> NodeID {
+        self.0.lock().await.node_id
+    }
+
     pub async fn send_event(&self, event: Event) -> Result<(), String> {
         info!("Sending event: {:?}", event);
         let msg = serde_json::to_string(&event).unwrap().into();
