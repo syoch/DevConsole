@@ -231,6 +231,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "devconsole_client"
+version = "0.1.0"
+dependencies = [
+ "devconsole_protocol",
+ "env_logger",
+ "futures-util",
+ "log",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
+name = "devconsole_data_logger"
+version = "0.1.0"
+dependencies = [
+ "devconsole_client",
+ "env_logger",
+ "log",
+ "serde",
+ "serde_json",
+ "srobo_base",
+ "tokio",
+]
+
+[[package]]
 name = "devconsole_protocol"
 version = "0.1.0"
 dependencies = [
@@ -241,9 +267,13 @@ dependencies = [
 name = "devconsole_serial_monitor"
 version = "0.1.0"
 dependencies = [
+ "devconsole_client",
  "env_logger",
  "log",
+ "serde",
+ "serde_json",
  "srobo_base",
+ "tokio",
 ]
 
 [[package]]

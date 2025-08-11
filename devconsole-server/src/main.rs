@@ -30,7 +30,11 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
         .await
         .unwrap();
 
-    let mut reader = reader.filter(|x| futures_util::future::ready(x.is_ok()));
+    let mut reader = reader
+        .filter(|x| futures_util::future::ready(x.is_ok()))
+        .inspect(|x| {
+            info!("Received message: {:?}", x);
+        });
 
     loop {
         let msg = match reader.next().await {
@@ -97,6 +101,9 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
 
 #[tokio::main]
 async fn main() {
+    logger::Builder::new()
+        .filter(None, log::LevelFilter::Debug)
+        .init();
     let tcp_server = TcpListener::bind("127.0.0.1:9001").await.unwrap();
 
     let server: SharedServer = SharedServer::new_default();

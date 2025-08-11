@@ -2,7 +2,7 @@ use devconsole_protocol::{ChannelID, Event, NodeID};
 use futures_util::SinkExt;
 use futures_util::lock::Mutex;
 use futures_util::stream::SplitSink;
-use log::error;
+use log::{error, info};
 use std::cell::RefCell;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -34,6 +34,7 @@ impl SharedClient {
     }
 
     pub async fn send_event(&self, event: Event) -> Result<(), String> {
+        info!("Sending event: {:?}", event);
         let msg = serde_json::to_string(&event).unwrap().into();
         self.0
             .lock()

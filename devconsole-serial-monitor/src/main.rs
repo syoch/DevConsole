@@ -9,6 +9,15 @@ use std::sync::mpsc;
 use std::thread::spawn;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+enum SerialEvent {
+    Opened { path: String },
+    Line { path: String, line: String },
+    Closed { path: String },
+}
+
 pub fn main() {
     // initialize the logger as debug level
     logger::Builder::new()
@@ -34,7 +43,6 @@ pub fn main() {
                     serial_monitor::monitor_thread(device, tx);
                 });
             }
-            Ok(device_watcher::Event::DeviceRemoved(device)) => (),
             Err(mpsc::RecvTimeoutError::Timeout) => (),
             Err(e) => {
                 error!("Error receiving message from device watcher: {}", e);

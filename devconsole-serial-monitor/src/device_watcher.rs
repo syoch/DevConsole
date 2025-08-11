@@ -2,7 +2,6 @@ use std::{fs, sync::mpsc, thread, time::Duration};
 
 pub enum Event {
     DeviceFound(String),
-    DeviceRemoved(String),
 }
 
 pub fn watcher_thread(tx: mpsc::Sender<Event>) {
@@ -40,7 +39,6 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
 
         for device in found_devices.clone() {
             if !fs::metadata(format!("/dev/{}", device)).is_ok() {
-                let _ = tx.send(Event::DeviceRemoved(device.to_string()));
                 found_devices.retain(|d| d != &device);
             }
         }
