@@ -1,5 +1,6 @@
 use std::{fs, sync::mpsc, thread, time::Duration};
 
+#[derive(Debug)]
 pub enum Event {
     DeviceFound(String),
 }

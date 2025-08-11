@@ -5,6 +5,7 @@ use srobo_base::{
     utils::fifo::Spsc,
 };
 
+#[derive(Debug)]
 pub enum Event {
     LineReceipt(String, String),
     Closed(String),

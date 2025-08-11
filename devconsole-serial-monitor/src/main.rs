@@ -10,7 +10,6 @@ use std::thread::spawn;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tokio::time::sleep;
 
 #[derive(Debug, Serialize, Deserialize)]
 enum SerialEvent {
@@ -19,26 +18,24 @@ enum SerialEvent {
     Closed { path: String },
 }
 
-pub fn main1() {
-    // initialize the logger as debug level
-    logger::Builder::new()
-        .filter(None, log::LevelFilter::Debug)
-        .init();
-
-    let (tx, rx) = mpsc::channel();
-
-    info!("Starting serial device watcher...");
+fn monitor(event_tx: mpsc::Sender<SerialEvent>) {
+    let (dev_tx, dev_rx) = mpsc::channel();
     spawn(move || {
-        device_watcher::watcher_thread(tx);
+        device_watcher::watcher_thread(dev_tx);
     });
 
     let (serial_tx, serial_rx) = mpsc::channel();
-
     loop {
-        let msg = rx.recv_timeout(Duration::from_millis(1));
+        let msg = dev_rx.recv_timeout(Duration::from_millis(1));
+        // debug!("Received message from device watcher: {:?}", msg);
         match msg {
             Ok(device_watcher::Event::DeviceFound(device)) => {
-                info!("Found serial device: {}", device);
+                event_tx
+                    .send(SerialEvent::Opened {
+                        path: device.clone(),
+                    })
+                    .unwrap();
+
                 let tx = serial_tx.clone();
                 spawn(move || {
                     serial_monitor::monitor_thread(device, tx);
@@ -51,12 +48,19 @@ pub fn main1() {
             }
         }
 
-        match serial_rx.recv_timeout(Duration::from_millis(1)) {
+        let msg = serial_rx.recv_timeout(Duration::from_millis(1));
+        // debug!("Received message from serial monitor: {:?}", msg);
+        match msg {
             Ok(serial_monitor::Event::LineReceipt(path, line)) => {
-                info!("Received line from {}: {}", path, line);
+                event_tx
+                    .send(SerialEvent::Line {
+                        path,
+                        line: line.to_string(),
+                    })
+                    .unwrap();
             }
             Ok(serial_monitor::Event::Closed(path)) => {
-                info!("Serial device closed: {}", path);
+                event_tx.send(SerialEvent::Closed { path }).unwrap();
             }
             Err(mpsc::RecvTimeoutError::Timeout) => (),
             Err(e) => {
@@ -69,22 +73,29 @@ pub fn main1() {
 
 #[tokio::main]
 pub async fn main() {
+    // initialize the logger as debug level
     logger::Builder::new()
         .filter(None, log::LevelFilter::Debug)
         .init();
-    let mut client = devconsole_client::DCClient::new("ws://127.0.0.1:9001")
+
+    let mut client = devconsole_client::DCClient::new("ws://localhost:9001")
         .await
-        .unwrap();
-    let a = client
-        .open("my_channel".to_string())
+        .expect("Failed to connect to WebSocket server");
+
+    let channel = client
+        .open("SerialMonitor".to_string())
         .await
         .expect("Failed to open channel");
-    info!("Opened channel: {:?}", a);
+
+    let (event_tx, event_rx) = mpsc::channel();
+    spawn(move || {
+        monitor(event_tx);
+    });
 
     loop {
-        let b = client.send(a, "Hello, world!".to_string()).await;
-        info!("Sent message: {:?}", b);
+        let event = event_rx.recv().expect("Failed to receive event");
+        let payload = serde_json::to_string(&event).unwrap();
 
-        sleep(Duration::from_secs(1)).await;
+        client.send(channel, payload).await.unwrap();
     }
 }
