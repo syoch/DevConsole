@@ -1,20 +1,47 @@
-type Channel = u64;
+use serde::{Deserialize, Serialize};
 
+pub type ChannelID = u64;
+pub type NodeID = u64;
+
+pub enum TransactionError {
+    ChannelConflicted,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
-    Accepted,
-    Denied,
-    Conflicted,
+    NodeIDNotification {
+        node_id: NodeID,
+    },
 
-    Data { channel: Channel, data: String },
+    Data {
+        channel: ChannelID,
+        data: String,
+    },
 
-    ChannelOpen { name: String },
-    ChannelOpenResult { channel: Channel, success: bool },
+    ChannelOpenRequest {
+        name: String,
+    },
+    ChannelCloseRequest {
+        channel: ChannelID,
+    },
 
-    ChannelClosed { channel: Channel },
-    ChannelListen { channel: Channel },
+    ChannelListenRequest {
+        channel: ChannelID,
+    },
+    ChannelListenResponse {
+        channel: ChannelID,
+        success: bool,
+    },
 
     ChannelListRequest,
-    ChannelListResponse { channels: Vec<Channel> },
+    ChannelListResponse {
+        channels: Vec<ChannelID>,
+    },
 
-    ChannelInfoRequst,
+    ChannelInfoRequest(ChannelID),
+    ChannelInfoResponse {
+        channel: ChannelID,
+        name: String,
+        supplied_by: NodeID,
+    },
 }

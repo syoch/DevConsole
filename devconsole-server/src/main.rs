@@ -1,21 +1,107 @@
-use std::net::TcpListener;
-use std::thread::spawn;
-use tungstenite::accept;
+extern crate env_logger as logger;
+extern crate log;
 
-/// A WebSocket echo server
-pub fn main() {
-    let server = TcpListener::bind("127.0.0.1:9001").unwrap();
-    for stream in server.incoming() {
-        spawn(move || {
-            let mut websocket = accept(stream.unwrap()).unwrap();
-            loop {
-                let msg = websocket.read().unwrap();
+mod channel;
+mod client;
+mod id_manager;
+mod server;
 
-                // We do not want to send back ping/pong messages.
-                if msg.is_binary() || msg.is_text() {
-                    websocket.send(msg).unwrap();
+use devconsole_protocol::Event;
+use futures_util::StreamExt;
+use log::{error, info};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::accept_async;
+
+use crate::{client::SharedClient, server::SharedServer};
+
+async fn client_handler(stream: TcpStream, server: SharedServer) {
+    let (writer, reader) = accept_async(stream)
+        .await
+        .expect("Error during WebSocket handshake")
+        .split();
+
+    let node_id = server.get_new_node_id().await;
+    let client = SharedClient::new(writer, node_id);
+
+    server.add_connection(client.clone()).await;
+
+    client
+        .send_event(Event::NodeIDNotification { node_id })
+        .await
+        .unwrap();
+
+    let mut reader = reader.filter(|x| futures_util::future::ready(x.is_ok()));
+
+    loop {
+        let msg = match reader.next().await {
+            Some(Ok(msg)) => msg,
+            Some(Err(e)) => {
+                error!("Error receiving message: {}", e);
+                break;
+            }
+            None => {
+                break;
+            }
+        };
+
+        // We do not want to send back ping/pong messages.
+        if msg.is_binary() || msg.is_text() {
+            let evt = serde_json::from_str::<Event>(msg.to_text().unwrap()).unwrap();
+
+            match evt {
+                Event::Data { channel, data } => {
+                    server.broadcast_data(channel, data).await;
+                }
+                Event::ChannelOpenRequest { name } => {
+                    server.new_channel(name, node_id).await;
+                }
+                Event::ChannelListenRequest { channel } => {
+                    let response = Event::ChannelListenResponse {
+                        channel,
+                        success: client.listen(channel).await.is_ok(),
+                    };
+                    client.send_event(response).await.unwrap();
+                }
+                Event::ChannelCloseRequest { channel } => {
+                    info!("Received ChannelCloseRequest for channel {}", channel);
+                }
+
+                Event::ChannelListRequest => {
+                    let channels = server.get_channel_ids().await;
+                    let response = Event::ChannelListResponse { channels };
+                    client.send_event(response).await.unwrap();
+                }
+
+                Event::ChannelInfoRequest(channel) => {
+                    if let Some(info) = server.get_channel(channel).await {
+                        let response = Event::ChannelInfoResponse {
+                            channel,
+                            name: info.name().to_string(),
+                            supplied_by: info.supplied_by(),
+                        };
+                        client.send_event(response).await.unwrap();
+                    } else {
+                        error!("ChannelInfoRequest for unknown channel {}", channel);
+                    }
+                }
+
+                _ => {
+                    error!("Unhandled event: {:?}", evt);
                 }
             }
-        });
+        }
+    }
+
+    server.remove_connection(&client).await;
+}
+
+#[tokio::main]
+async fn main() {
+    let tcp_server = TcpListener::bind("127.0.0.1:9001").await.unwrap();
+
+    let server: SharedServer = SharedServer::new_default();
+
+    while let Ok((stream, _)) = tcp_server.accept().await {
+        tokio::spawn(client_handler(stream, server.clone()));
     }
 }
