@@ -1,3 +1,7 @@
+use std::time::Duration;
+
+use tokio::{spawn, sync::mpsc, time::sleep};
+
 #[macro_use]
 extern crate log;
 extern crate env_logger as logger;
@@ -13,13 +17,21 @@ pub async fn main() {
 
     let mut listening_channels = vec![];
 
+    let (tx, mut rx) = mpsc::channel(64);
+    spawn(async move {
+        while let Some((channel, data)) = rx.recv().await {
+            info!("Received data on channel {}: {}", channel, data);
+        }
+    });
     loop {
         let channel_list = client.channel_list().await.unwrap();
         for channel in channel_list {
             if !listening_channels.contains(&channel) {
-                client.listen(channel).await.unwrap();
+                client.listen(channel, tx.clone()).await.unwrap();
                 listening_channels.push(channel);
             }
         }
+
+        sleep(Duration::from_secs(5)).await;
     }
 }

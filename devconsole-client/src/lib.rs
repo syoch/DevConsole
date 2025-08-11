@@ -13,7 +13,7 @@ use futures_util::{
 use log::{debug, info, warn};
 use tokio::{
     net::TcpStream,
-    sync::{Mutex, oneshot},
+    sync::{Mutex, mpsc, oneshot},
 };
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
@@ -61,6 +61,7 @@ struct Dispatchers {
     events: HashMap<DispatchID, oneshot::Sender<bool>>,
     resolve_channel: Option<oneshot::Sender<ChannelID>>,
     channel_list: Option<oneshot::Sender<Vec<ChannelID>>>,
+    data_handlers: HashMap<ChannelID, mpsc::Sender<(ChannelID, String)>>,
 }
 
 struct SharedDispatchers(Arc<Mutex<Dispatchers>>);
@@ -141,6 +142,22 @@ impl SharedDispatchers {
             warn!("No dispatcher found for channel list");
         }
     }
+
+    pub async fn register_data_handler(
+        &self,
+        channel: ChannelID,
+        handler: mpsc::Sender<(ChannelID, String)>,
+    ) {
+        self.lock().await.data_handlers.insert(channel, handler);
+    }
+
+    pub async fn dispatch_data(&self, channel: ChannelID, data: String) {
+        if let Some(handler) = self.lock().await.data_handlers.get(&channel) {
+            let _ = handler.send((channel, data)).await;
+        } else {
+            warn!("No data handler found for channel: {}", channel);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -173,7 +190,11 @@ impl DCClient {
         Ok(client)
     }
 
-    pub async fn listen(&mut self, channel: ChannelID) -> Result<(), DCClientError> {
+    pub async fn listen(
+        &mut self,
+        channel: ChannelID,
+        channel_tx: mpsc::Sender<(ChannelID, String)>,
+    ) -> Result<(), DCClientError> {
         if self.listening_channels.contains(&channel) {
             warn!("Channel {} is already being listened to", channel);
             return Ok(());
@@ -183,6 +204,10 @@ impl DCClient {
         self.send_evt(Event::ChannelListenRequest { channel })
             .await
             .map_err(DCClientError::WSError)?;
+
+        self.dispatches
+            .register_data_handler(channel, channel_tx)
+            .await;
 
         let response = self
             .dispatches
@@ -242,20 +267,20 @@ impl DCClient {
                         info!("Node ID: {}", node_id);
                     }
                     Event::Data { channel, data } => {
-                        info!("Received data on channel {}: {}", channel, data);
+                        dispatchers.dispatch_data(channel, data).await;
                     }
-                    Event::ChannelOpenResponse { channel, success } => {
-                        info!("Channel open request for: {}", channel);
+                    Event::ChannelOpenResponse {
+                        channel,
+                        success: _,
+                    } => {
                         dispatchers.dispatch_channel(channel).await;
                     }
                     Event::ChannelListenResponse { channel, success } => {
-                        info!("Channel listen response for {}: {}", channel, success);
                         dispatchers
                             .dispatch_event(DispatchID::Listen(channel), success)
                             .await;
                     }
                     Event::ChannelListResponse { channels } => {
-                        info!("Received channel list: {:?}", channels);
                         dispatchers.dispatch_channel_list(channels).await;
                     }
                     // Event::ChannelInfoResponse {
