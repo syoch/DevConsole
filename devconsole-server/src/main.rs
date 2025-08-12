@@ -32,9 +32,7 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
 
     let mut reader = reader
         .filter(|x| futures_util::future::ready(x.is_ok()))
-        .inspect(|x| {
-            info!("Received message: {:?}", x);
-        });
+        /* .inspect(|x| { info!("Received message: {:?}", x);}) */;
 
     loop {
         let msg = match reader.next().await {
