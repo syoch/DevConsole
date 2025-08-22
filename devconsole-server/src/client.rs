@@ -2,7 +2,7 @@ use devconsole_protocol::{ChannelID, Event, NodeID};
 use futures_util::SinkExt;
 use futures_util::lock::Mutex;
 use futures_util::stream::SplitSink;
-use log::{error, info};
+use log::error;
 use std::cell::RefCell;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -47,7 +47,7 @@ impl SharedClient {
             .send(Message::Text(msg))
             .await
             .map_err(|e| {
-                error!("Error sending event: {}", e);
+                error!("Error sending event: {e}");
                 e.to_string()
             })?;
 
@@ -65,7 +65,7 @@ impl SharedClient {
             client.listening_channels.borrow_mut().push(channel);
             Ok(())
         } else {
-            Err(format!("Already listening to channel {}", channel))
+            Err(format!("Already listening to channel {channel}"))
         }
     }
 }

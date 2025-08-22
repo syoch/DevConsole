@@ -38,7 +38,7 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
         let msg = match reader.next().await {
             Some(Ok(msg)) => msg,
             Some(Err(e)) => {
-                error!("Error receiving message: {}", e);
+                error!("Error receiving message: {e}");
                 break;
             }
             None => {
@@ -72,7 +72,7 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
                     client.send_event(response).await.unwrap();
                 }
                 Event::ChannelCloseRequest { channel } => {
-                    info!("Received ChannelCloseRequest for channel {}", channel);
+                    info!("Received ChannelCloseRequest for channel {channel}");
                 }
 
                 Event::ChannelListRequest => {
@@ -83,19 +83,20 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
 
                 Event::ChannelInfoRequest(channel) => {
                     if let Some(info) = server.get_channel(channel).await {
-                        let response = Event::ChannelInfoResponse {
+                        let channel_info = devconsole_protocol::ChannelInfo {
                             channel,
                             name: info.name().to_string(),
                             supplied_by: info.supplied_by(),
                         };
+                        let response = Event::ChannelInfoResponse(channel_info);
                         client.send_event(response).await.unwrap();
                     } else {
-                        error!("ChannelInfoRequest for unknown channel {}", channel);
+                        error!("ChannelInfoRequest for unknown channel {channel}");
                     }
                 }
 
                 _ => {
-                    error!("Unhandled event: {:?}", evt);
+                    error!("Unhandled event: {evt:?}");
                 }
             }
         }

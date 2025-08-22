@@ -4,13 +4,13 @@ use std::{
     sync::Arc,
 };
 
-use devconsole_protocol::{ChannelID, Event};
+use devconsole_protocol::{ChannelID, ChannelInfo, Event};
 use futures_util::{
     SinkExt, StreamExt,
     future::ready,
     stream::{SplitSink, SplitStream},
 };
-use log::{debug, info, warn};
+use log::{info, warn};
 use tokio::{
     net::TcpStream,
     sync::{Mutex, mpsc, oneshot},
@@ -39,10 +39,10 @@ impl From<&Event> for DispatchID {
             Event::ChannelListRequest => DispatchID::ChannelList,
             Event::ChannelListResponse { .. } => DispatchID::ChannelList,
             Event::ChannelInfoRequest(channel) => DispatchID::ChannelInfo(*channel),
-            Event::ChannelInfoResponse { channel, .. } => DispatchID::ChannelInfo(*channel),
+            Event::ChannelInfoResponse(info) => DispatchID::ChannelInfo(info.channel),
 
             Event::Data { channel, .. } => {
-                panic!("Data event should not be dispatched: {:?}", channel)
+                panic!("Data event should not be dispatched: {channel:?}")
             }
 
             Event::NodeIDNotification { node_id: _ }
@@ -61,6 +61,7 @@ struct Dispatchers {
     events: HashMap<DispatchID, oneshot::Sender<bool>>,
     resolve_channel: Option<oneshot::Sender<ChannelID>>,
     channel_list: Option<oneshot::Sender<Vec<ChannelID>>>,
+    channel_info: Option<oneshot::Sender<ChannelInfo>>,
     data_handlers: HashMap<ChannelID, mpsc::Sender<(ChannelID, String)>>,
 }
 
@@ -98,18 +99,15 @@ impl SharedDispatchers {
 
         self.lock().await.events.insert(id, tx);
 
-        let response = rx
-            .await
-            .expect("Failed to receive response for channel listen request");
-
-        response
+        rx.await
+            .expect("Failed to receive response for channel listen request")
     }
 
     pub async fn dispatch_event(&self, id: DispatchID, success: bool) {
         if let Some(tx) = self.lock().await.events.remove(&id) {
             let _ = tx.send(success);
         } else {
-            warn!("No dispatcher found for event: {:?}", id);
+            warn!("No dispatcher found for event: {id:?}");
         }
     }
 
@@ -143,6 +141,21 @@ impl SharedDispatchers {
         }
     }
 
+    pub async fn dispatch_channel_info(&self, info: ChannelInfo) {
+        if let Some(tx) = self.lock().await.channel_info.take() {
+            let _ = tx.send(info);
+        } else {
+            warn!("No dispatcher found for channel info");
+        }
+    }
+
+    pub async fn wait_for_channel_info(&self) -> ChannelInfo {
+        let (tx, rx) = oneshot::channel();
+        self.lock().await.channel_info = Some(tx);
+
+        rx.await.expect("Failed to receive channel info")
+    }
+
     pub async fn register_data_handler(
         &self,
         channel: ChannelID,
@@ -155,7 +168,7 @@ impl SharedDispatchers {
         if let Some(handler) = self.lock().await.data_handlers.get(&channel) {
             let _ = handler.send((channel, data)).await;
         } else {
-            warn!("No data handler found for channel: {}", channel);
+            warn!("No data handler found for channel: {channel}");
         }
     }
 }
@@ -196,7 +209,7 @@ impl DCClient {
         channel_tx: mpsc::Sender<(ChannelID, String)>,
     ) -> Result<(), DCClientError> {
         if self.listening_channels.contains(&channel) {
-            warn!("Channel {} is already being listened to", channel);
+            warn!("Channel {channel} is already being listened to");
             return Ok(());
         }
         self.listening_channels.push(channel);
@@ -214,7 +227,7 @@ impl DCClient {
             .wait_for_event(DispatchID::Listen(channel))
             .await;
 
-        if response == false {
+        if !response {
             Err(DCClientError::ConnectionBroken)
         } else {
             Ok(())
@@ -244,6 +257,14 @@ impl DCClient {
         let channels = self.dispatches.wait_for_channel_list().await;
         Ok(channels)
     }
+    pub async fn channel_info(&mut self, channel: ChannelID) -> Result<ChannelInfo, DCClientError> {
+        self.send_evt(Event::ChannelInfoRequest(channel))
+            .await
+            .map_err(DCClientError::WSError)?;
+
+        let info = self.dispatches.wait_for_channel_info().await;
+        Ok(info)
+    }
 
     async fn send_evt(
         &mut self,
@@ -264,7 +285,7 @@ impl DCClient {
             .for_each(|event| async {
                 match event {
                     Event::NodeIDNotification { node_id } => {
-                        info!("Node ID: {}", node_id);
+                        info!("Node ID: {node_id}");
                     }
                     Event::Data { channel, data } => {
                         dispatchers.dispatch_data(channel, data).await;
@@ -283,13 +304,12 @@ impl DCClient {
                     Event::ChannelListResponse { channels } => {
                         dispatchers.dispatch_channel_list(channels).await;
                     }
-                    // Event::ChannelInfoResponse {
-                    //     channel,
-                    //     name,
-                    //     supplied_by,
-                    // } => {}
+
+                    Event::ChannelInfoResponse(info) => {
+                        dispatchers.dispatch_channel_info(info).await;
+                    }
                     _ => {
-                        warn!("Unhandled event: {:?}", event);
+                        warn!("Unhandled event: {event:?}");
                     }
                 }
             })
