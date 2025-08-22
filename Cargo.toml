@@ -4,6 +4,9 @@ members = [
     "devconsole-server",
     "devconsole-client",
     "devconsole-protocol",
-    "devconsole-serial-monitor",
     "devconsole-data-logger",
+
+    "devconsole-serial-monitor",
+    "devconsole-serial-protocol",
+    "devconsole_serial_logger",
 ]

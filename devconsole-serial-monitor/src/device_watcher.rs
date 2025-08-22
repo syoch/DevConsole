@@ -12,7 +12,7 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
         let entries = match fs::read_dir("/dev") {
             Ok(entries) => entries,
             Err(e) => {
-                error!("Failed to read /dev: {}", e);
+                error!("Failed to read /dev: {e}");
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
@@ -20,7 +20,7 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
 
         for entry in entries {
             if let Err(e) = entry {
-                error!("Failed to read entry in /dev: {}", e);
+                error!("Failed to read entry in /dev: {e}");
                 continue;
             }
             let entry = entry.unwrap();
@@ -39,7 +39,7 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
         }
 
         for device in found_devices.clone() {
-            if !fs::metadata(format!("/dev/{}", device)).is_ok() {
+            if fs::metadata(format!("/dev/{device}")).is_err() {
                 found_devices.retain(|d| d != &device);
             }
         }

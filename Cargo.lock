@@ -251,16 +251,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "devconsole_serial_monitor"
+name = "devconsole_serial_logger"
 version = "0.1.0"
 dependencies = [
  "devconsole_client",
+ "devconsole_serial_protocol",
  "env_logger",
  "log",
  "serde",
  "serde_json",
  "srobo_base",
  "tokio",
+]
+
+[[package]]
+name = "devconsole_serial_monitor"
+version = "0.1.0"
+dependencies = [
+ "devconsole_client",
+ "devconsole_serial_protocol",
+ "env_logger",
+ "log",
+ "serde",
+ "serde_json",
+ "srobo_base",
+ "tokio",
+]
+
+[[package]]
+name = "devconsole_serial_protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

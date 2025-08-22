@@ -5,18 +5,10 @@ extern crate env_logger as logger;
 mod device_watcher;
 mod serial_monitor;
 
+use devconsole_serial_protocol::SerialEvent;
 use std::sync::mpsc;
 use std::thread::spawn;
 use std::time::Duration;
-
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-enum SerialEvent {
-    Opened { path: String },
-    Line { path: String, line: String },
-    Closed { path: String },
-}
 
 fn monitor(event_tx: mpsc::Sender<SerialEvent>) {
     let (dev_tx, dev_rx) = mpsc::channel();
@@ -43,7 +35,7 @@ fn monitor(event_tx: mpsc::Sender<SerialEvent>) {
             }
             Err(mpsc::RecvTimeoutError::Timeout) => (),
             Err(e) => {
-                error!("Error receiving message from device watcher: {}", e);
+                error!("Error receiving message from device watcher: {e}");
                 break;
             }
         }
@@ -64,7 +56,7 @@ fn monitor(event_tx: mpsc::Sender<SerialEvent>) {
             }
             Err(mpsc::RecvTimeoutError::Timeout) => (),
             Err(e) => {
-                error!("Error receiving message from serial device: {}", e);
+                error!("Error receiving message from serial device: {e}");
                 return;
             }
         }
