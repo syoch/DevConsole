@@ -1,12 +1,12 @@
 [workspace]
 
 members = [
-    "devconsole-server",
-    "devconsole-client",
-    "devconsole-protocol",
-    "devconsole-data-logger",
+    "devconsole_server",
+    "devconsole_client",
+    "devconsole_protocol",
+    "devconsole_data_logger",
 
-    "devconsole-serial-monitor",
-    "devconsole-serial-protocol",
+    "devconsole_serial_monitor",
+    "devconsole_serial_protocol",
     "devconsole_serial_logger",
 ]

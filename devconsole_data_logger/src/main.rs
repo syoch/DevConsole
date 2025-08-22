@@ -20,7 +20,7 @@ pub async fn main() {
     let (tx, mut rx) = mpsc::channel(64);
     spawn(async move {
         while let Some((channel, data)) = rx.recv().await {
-            info!("Received data on channel {}: {}", channel, data);
+            info!("Received data on channel {channel}: {data}");
         }
     });
     loop {
