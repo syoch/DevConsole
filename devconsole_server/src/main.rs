@@ -8,7 +8,7 @@ mod server;
 
 use devconsole_protocol::Event;
 use futures_util::StreamExt;
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::accept_async;
 
@@ -48,7 +48,9 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
 
         // We do not want to send back ping/pong messages.
         if msg.is_binary() || msg.is_text() {
-            let evt = serde_json::from_str::<Event>(msg.to_text().unwrap()).unwrap();
+            let msg = msg.to_text().unwrap();
+            let evt = serde_json::from_str::<Event>(msg).unwrap();
+            debug!("Received message: {evt:?}");
 
             match evt {
                 Event::Data { channel, data } => {
