@@ -1,11 +1,12 @@
-use std::{fs, sync::mpsc, thread, time::Duration};
+use std::{fs, thread, time::Duration};
+use tokio::{sync::mpsc, time::sleep};
 
 #[derive(Debug)]
 pub enum Event {
     DeviceFound(String),
 }
 
-pub fn watcher_thread(tx: mpsc::Sender<Event>) {
+pub async fn watcher_thread(tx: mpsc::Sender<Event>) {
     let mut found_devices = Vec::new();
 
     loop {
@@ -32,9 +33,11 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
             }
             if fname.starts_with("ttyACM") || fname.starts_with("ttyUSB") {
                 found_devices.push(fname.clone());
-                let _ = tx.send(Event::DeviceFound(
+                tx.send(Event::DeviceFound(
                     entry.path().to_string_lossy().to_string(),
-                ));
+                ))
+                .await
+                .expect("Failed to send device found event");
             }
         }
 
@@ -44,6 +47,6 @@ pub fn watcher_thread(tx: mpsc::Sender<Event>) {
             }
         }
 
-        thread::sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(1)).await;
     }
 }
