@@ -1,0 +1,43 @@
+---
+convention:
+  commitTypes:
+  - Feat     # Commits, that add or remove a new feature to the API or UI
+  - Fix      # Commits, that fix a API or UI bug of a preceded feat commit
+  - Refactor # Commits, that rewrite/restructure your code, however do not change any API or UI behaviour
+  - Perf     # Commits are special `refactor` commits, that improve performance
+  - Style    # Commits, that do not affect the meaning (white-space, formatting, missing semi-colons, etc)
+  - Test     # Commits, that add missing tests or correcting existing tests
+  - Build    # Commits, that affect build components like build tool, ci pipeline, dependencies, project version, ...
+  - Ops      # Commits, that affect operational components like infrastructure, deployment, backup, recovery, ...
+  - Docs     # Commits, that affect documentation only
+  - Chore    # Miscellaneous commits e.g. modifying `.gitignore`
+  - Merge
+  - Revert
+  commitScopes: []
+  releaseTagGlobPattern: v[0-9]*.[0-9]*.[0-9]*
+changelog:
+  commitTypes:
+  - feat
+  - fix
+  - perf
+  - merge
+  includeInvalidCommits: true
+  commitIgnoreRegexPattern: "^WIP "
+  headlines:
+    feat: Features
+    fix: Bug Fixes
+    perf: Performance Improvements
+    merge: Merges
+    breakingChange: BREAKING CHANGES
+
+  ## GitHub
+  # commitUrl: https://github.com/ACCOUNT/REPOSITORY/commit/%commit%
+  # commitRangeUrl: https://github.com/ACCOUNT/REPOSITORY/compare/%from%...%to%?diff=split
+
+  ## GitHub Issues
+  # issueRegexPattern: "#[0-9]+"
+  # issueUrl: https://github.com/ACCOUNT/REPOSITORY/issues/%issue%
+
+  ## Jira Issues
+  # issueRegexPattern: "[A-Z][A-Z0-9]+-[0-9]+"
+  # issueUrl: https://WORKSPACE.atlassian.net/browse/%issue%

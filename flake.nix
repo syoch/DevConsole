@@ -16,12 +16,11 @@
           udev
           rustfmt
           rustc
+          clippy
 
-          chromium
+          git-conventional-commits
         ];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-        PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
-        PUPPETEER_BROWSER = "chrome";
       };
     };
 }
