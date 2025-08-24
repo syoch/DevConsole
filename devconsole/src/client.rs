@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use devconsole_protocol::{ChannelID, ChannelInfo, Event};
+use crate::{ChannelID, ChannelInfo, Event};
 use futures_util::{
     SinkExt, StreamExt,
     future::ready,

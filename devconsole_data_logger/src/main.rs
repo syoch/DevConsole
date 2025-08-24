@@ -11,7 +11,7 @@ pub async fn main() {
     logger::Builder::new()
         .filter(None, log::LevelFilter::Debug)
         .init();
-    let mut client = devconsole_client::DCClient::new("ws://127.0.0.1:9001")
+    let mut client = devconsole::DCClient::new("ws://127.0.0.1:9001")
         .await
         .unwrap();
 

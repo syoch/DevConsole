@@ -1,12 +1,15 @@
 [workspace]
 resolver = "3"
 members = [
+    "devconsole",
     "devconsole_server",
-    "devconsole_client",
-    "devconsole_protocol",
     "devconsole_data_logger",
 
     "devconsole_serial_monitor",
     "devconsole_serial_protocol",
     "devconsole_serial_logger",
 ]
+
+[patch.crates-io]
+devconsole = { path = "devconsole" }
+devconsole_serial_protocol = { path = "devconsole_serial_protocol" }

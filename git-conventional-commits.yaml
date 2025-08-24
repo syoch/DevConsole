@@ -17,18 +17,18 @@ convention:
   releaseTagGlobPattern: v[0-9]*.[0-9]*.[0-9]*
 changelog:
   commitTypes:
-  - feat
-  - fix
-  - perf
-  - merge
+  - Feat
+  - Fix
+  - Perf
+  - Merge
   includeInvalidCommits: true
   commitIgnoreRegexPattern: "^WIP "
   headlines:
-    feat: Features
-    fix: Bug Fixes
-    perf: Performance Improvements
-    merge: Merges
-    breakingChange: BREAKING CHANGES
+    Feat: Features
+    Fix: Bug Fixes
+    Perf: Performance Improvements
+    Merge: Merges
+    BreakingChange: BREAKING CHANGES
 
   ## GitHub
   # commitUrl: https://github.com/ACCOUNT/REPOSITORY/commit/%commit%

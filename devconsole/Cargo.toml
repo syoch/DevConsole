@@ -1,12 +1,15 @@
 [package]
-name = "devconsole_client"
-version = "0.1.0"
+name = "devconsole"
+version = "1.0.0"
+license = "MIT"
+authors = ["syoch <syoch64@gmail.com>"]
+description = "DevConsole Library with client implementation"
 edition = "2024"
 
 [dependencies]
 env_logger = "0.11.8"
 log = "0.4.27"
-devconsole_protocol = { path = "../devconsole_protocol" }
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
 tokio-tungstenite = "0.27.0"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "sync"] }
