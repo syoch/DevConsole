@@ -5,6 +5,7 @@ extern crate env_logger as logger;
 mod device_watcher;
 mod serial_monitor;
 
+use devconsole::DCClient;
 use devconsole_serial_protocol::{SerialEvent, SerialRequest};
 use std::collections::HashMap;
 use tokio::{
@@ -188,7 +189,7 @@ pub async fn main() {
         .filter(None, log::LevelFilter::Debug)
         .init();
 
-    let mut client = devconsole_client::DCClient::new("ws://localhost:9001")
+    let mut client = DCClient::new("ws://localhost:9001")
         .await
         .expect("Failed to connect to WebSocket server");
 

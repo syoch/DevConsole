@@ -6,7 +6,7 @@ mod client;
 mod id_manager;
 mod server;
 
-use devconsole_protocol::Event;
+use devconsole::{ChannelInfo, Event};
 use futures_util::StreamExt;
 use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
@@ -85,7 +85,7 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
 
                 Event::ChannelInfoRequest(channel) => {
                     if let Some(info) = server.get_channel(channel).await {
-                        let channel_info = devconsole_protocol::ChannelInfo {
+                        let channel_info = ChannelInfo {
                             channel,
                             name: info.name().to_string(),
                             supplied_by: info.supplied_by(),

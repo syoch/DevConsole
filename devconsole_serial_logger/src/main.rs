@@ -5,7 +5,7 @@ mod pkt_uart;
 
 use std::collections::HashMap;
 
-use devconsole_client::DCClient;
+use devconsole::DCClient;
 use devconsole_serial_protocol::SerialEvent;
 use log::debug;
 use tokio::{spawn, sync::mpsc};
@@ -90,9 +90,7 @@ pub async fn main() {
         .filter(None, log::LevelFilter::Debug)
         .init();
 
-    let mut client = devconsole_client::DCClient::new("ws://127.0.0.1:9001")
-        .await
-        .unwrap();
+    let mut client = DCClient::new("ws://127.0.0.1:9001").await.unwrap();
 
     let (tx, mut rx) = mpsc::channel(100);
 

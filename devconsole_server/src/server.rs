@@ -1,4 +1,4 @@
-use devconsole_protocol::{ChannelID, Event, NodeID};
+use devconsole::{ChannelID, Event, NodeID};
 use futures_util::lock::Mutex;
 use std::sync::Arc;
 

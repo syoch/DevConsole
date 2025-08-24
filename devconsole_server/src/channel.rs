@@ -1,4 +1,4 @@
-use devconsole_protocol::{ChannelID, NodeID};
+use devconsole::{ChannelID, NodeID};
 
 #[derive(Clone)]
 pub struct Channel {
