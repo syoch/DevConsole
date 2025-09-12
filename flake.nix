@@ -17,10 +17,18 @@
           rustfmt
           rustc
           clippy
+          runit
+          websocat
 
           git-conventional-commits
         ];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
+
+        # SVDIR = (root)/.services
+        shellHook = ''
+          export RUST_BACKTRACE=1
+          export SVDIR=$PWD/.services
+        '';
       };
     };
 }
