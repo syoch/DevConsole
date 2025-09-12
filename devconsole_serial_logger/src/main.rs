@@ -46,8 +46,20 @@ impl DeviceHandler {
         loop {
             let (dest_addr, data) = rx.read_pkt().await.expect("Failed to read packet");
 
+            let mut s = String::new();
+            for &b in &data {
+                match b {
+                    b'\x1b' => s.push_str(r"\e"),
+                    b'\n' => s.push_str(r"\n"),
+                    b'\r' => s.push_str(r"\r"),
+                    b'\t' => s.push_str(r"\t"),
+                    b'\0' => s.push_str(r"\0"),
+                    0x20..=0x7e => s.push(b as char),
+                    _ => s.push_str(&format!(r"\x{:02X}", b)),
+                }
+            }
             // Show
-            debug!("Received packet: {dest_addr}, data={data:?}");
+            debug!("Received packet: {dest_addr}, {s}");
         }
     }
 }

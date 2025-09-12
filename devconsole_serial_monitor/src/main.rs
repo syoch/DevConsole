@@ -5,7 +5,7 @@ extern crate env_logger as logger;
 mod device_watcher;
 mod serial_monitor;
 
-use devconsole::DCClient;
+use devconsole::{ChannelID, DCClient};
 use devconsole_serial_protocol::{SerialEvent, SerialRequest};
 use std::collections::HashMap;
 use tokio::{
@@ -58,12 +58,22 @@ impl RequestMuxer {
                     }
                 }
                 request = data_rx.recv() => {
-                    if let Some(SerialRequest::Data { path, data }) = request {
-                        if let Some(tx) = rxs.get(&path) {
-                            tx.send(serial_monitor::RequestToDevice::Data(data))
-                                .await.expect("Failed to send data to device");
-                        } else {
-                            warn!("No TX found for path: {path}");
+                    match request {
+                        Some(SerialRequest::Data { path, data }) => {
+                            if let Some(tx) = rxs.get(&path) {
+                                tx.send(serial_monitor::RequestToDevice::Data(data))
+                                    .await.expect("Failed to send data to device");
+                            } else {
+                                warn!("No TX found for path: {path}");
+                            }
+                        },
+                        Some(SerialRequest::OpenVPort { path: _, channel_name: _ }) => {
+                            error!("OpenVPort request received in muxer, which is unexpected");
+                        },
+
+                        None => {
+                            error!("Error receiving data request");
+                            break;
                         }
                     }
                 }
@@ -87,12 +97,15 @@ impl RequestMuxer {
     }
 }
 
-async fn monitor(event_tx: Sender<SerialEvent>, mut data_rx: Receiver<SerialRequest>) {
+async fn monitor(client: &mut DCClient, channel: ChannelID, mut data_rx: Receiver<SerialRequest>)
+-> Result<(), Box<dyn std::error::Error>>
+ {
     let (dev_tx, mut dev_rx) = mpsc::channel(64);
     let (serial_tx, mut serial_rx) = mpsc::channel(64);
     spawn(device_watcher::watcher_thread(dev_tx));
 
     let mut req_muxer = RequestMuxer::new();
+    let mut vports = HashMap::new();
 
     loop {
         select! {
@@ -104,6 +117,12 @@ async fn monitor(event_tx: Sender<SerialEvent>, mut data_rx: Receiver<SerialRequ
                             .send(SerialRequest::Data { path, data })
                             .await.expect("Failed to send data to muxer");
                     }
+                    Some(SerialRequest::OpenVPort { path, channel_name }) => {
+                        if !vports.contains_key(&path) {
+                            let cid = client.open(channel_name).await?;
+                            vports.insert(path.clone(), cid);
+                        }
+                    }
                     None => {
                         error!("Error receiving message from data channel");
                         break;
@@ -114,11 +133,11 @@ async fn monitor(event_tx: Sender<SerialEvent>, mut data_rx: Receiver<SerialRequ
             msg = dev_rx.recv() => {
                 match msg {
                     Some(device_watcher::Event::DeviceFound(device)) => {
-                        event_tx
-                            .send(SerialEvent::Opened {
-                                path: device.clone(),
-                            })
-                            .await.expect("Failed to send opened event");
+                        let evt = SerialEvent::Opened {
+                            path: device.clone(),
+                        };
+                        let payload = serde_json::to_string(&evt).unwrap();
+                        client.send(channel, payload).await.unwrap();
 
                         let tx = serial_tx.clone();
 
@@ -139,24 +158,33 @@ async fn monitor(event_tx: Sender<SerialEvent>, mut data_rx: Receiver<SerialRequ
             msg = serial_rx.recv() => {
                 match msg {
                     Some(serial_monitor::Event::LineReceipt(path, line)) => {
-                        event_tx
-                            .send(SerialEvent::Line {
-                                path,
-                                line,
-                            })
-                            .await.expect("Failed to send line event");
+                        let evt = SerialEvent::Line {
+                            path: path.clone(),
+                            line: line.clone(),
+                        };
+                        let payload = serde_json::to_string(&evt).unwrap();
+                        client.send(channel, payload).await.unwrap();
+
+                        if let Some(cid) = vports.get(&path) {
+                            let payload = serde_json::to_string(&line).unwrap();
+                            client.send(*cid, payload).await.unwrap();
+                        }
                     }
                     Some(serial_monitor::Event::Closed(path)) => {
-                        event_tx.send(SerialEvent::Closed { path }).await.expect("Failed to send closed event");
+                        let evt = SerialEvent::Closed { path };
+                        let payload = serde_json::to_string(&evt).unwrap();
+                        client.send(channel, payload).await.unwrap();
                     }
                     None => {
                         error!("Error receiving message from serial device");
-                        return;
+                        break;
                     }
                 }
             }
         }
     }
+
+    Ok(())
 }
 
 async fn outbound_transformer(
@@ -205,14 +233,6 @@ pub async fn main() {
     let (req_tx, req_rx) = mpsc::channel(64);
     spawn(outbound_transformer(outbound_rx, req_tx));
 
-    let (event_tx, mut event_rx) = mpsc::channel(64);
-    spawn(monitor(event_tx, req_rx));
-
     info!("Starting serial_monitor...");
-    loop {
-        let event = event_rx.recv().await.expect("Failed to receive event");
-        let payload = serde_json::to_string(&event).unwrap();
-
-        client.send(channel, payload).await.unwrap();
-    }
+    monitor(&mut client, channel, req_rx).await;
 }

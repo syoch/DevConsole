@@ -10,4 +10,5 @@ pub enum SerialEvent {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SerialRequest {
     Data { path: String, data: Vec<u8> },
+    OpenVPort { path: String, channel_name: String },
 }
