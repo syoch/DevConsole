@@ -208,6 +208,7 @@ pub async fn main() {
     let (event_tx, mut event_rx) = mpsc::channel(64);
     spawn(monitor(event_tx, req_rx));
 
+    info!("Starting serial_monitor...");
     loop {
         let event = event_rx.recv().await.expect("Failed to receive event");
         let payload = serde_json::to_string(&event).unwrap();

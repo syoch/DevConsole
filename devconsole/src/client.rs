@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{ChannelID, ChannelInfo, Event};
+use crate::{ChannelID, ChannelInfo, Event, NodeID};
 use futures_util::{
     SinkExt, StreamExt,
     future::ready,
@@ -63,6 +63,7 @@ struct Dispatchers {
     channel_list: Option<oneshot::Sender<Vec<ChannelID>>>,
     channel_info: Option<oneshot::Sender<ChannelInfo>>,
     data_handlers: HashMap<ChannelID, mpsc::Sender<(ChannelID, String)>>,
+    node_id: Option<NodeID>,
 }
 
 struct SharedDispatchers(Arc<Mutex<Dispatchers>>);
@@ -171,12 +172,38 @@ impl SharedDispatchers {
             warn!("No data handler found for channel: {channel}");
         }
     }
+
+    pub async fn set_node_id(&self, node_id: NodeID) {
+        self.lock().await.node_id = Some(node_id);
+    }
+
+    pub async fn get_node_id(&self) -> Option<NodeID> {
+        self.lock().await.node_id
+    }
 }
 
 #[derive(Debug)]
 pub enum DCClientError {
     WSError(tungstenite::Error),
     ConnectionBroken,
+}
+
+impl std::fmt::Display for DCClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DCClientError::WSError(e) => write!(f, "WebSocket error: {e}"),
+            DCClientError::ConnectionBroken => write!(f, "Connection broken"),
+        }
+    }
+}
+
+impl std::error::Error for DCClientError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            DCClientError::WSError(e) => Some(e),
+            DCClientError::ConnectionBroken => None,
+        }
+    }
 }
 
 pub struct DCClient {
@@ -266,6 +293,10 @@ impl DCClient {
         Ok(info)
     }
 
+    pub async fn get_node_id(&self) -> Option<NodeID> {
+        self.dispatches.get_node_id().await
+    }
+
     async fn send_evt(
         &mut self,
         event: Event,
@@ -286,6 +317,7 @@ impl DCClient {
                 match event {
                     Event::NodeIDNotification { node_id } => {
                         info!("Node ID: {node_id}");
+                        dispatchers.set_node_id(node_id).await;
                     }
                     Event::Data { channel, data } => {
                         dispatchers.dispatch_data(channel, data).await;

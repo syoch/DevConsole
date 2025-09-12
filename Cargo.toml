@@ -8,6 +8,7 @@ members = [
     "devconsole_serial_monitor",
     "devconsole_serial_protocol",
     "devconsole_serial_logger",
+    "devconsole_cli",
 ]
 
 [patch.crates-io]

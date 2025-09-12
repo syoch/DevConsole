@@ -1,0 +1,251 @@
+use clap::{Arg, ArgMatches, Command};
+use devconsole::{DCClient, ChannelID};
+use log::error;
+use std::io::{self, Write};
+use tokio::sync::mpsc;
+
+#[tokio::main]
+pub async fn main() {
+    env_logger::Builder::new()
+        .filter(None, log::LevelFilter::Info)
+        .format_timestamp(None)
+        .format_module_path(false)
+        .format_target(false)
+        .init();
+
+    let matches = Command::new("devconsole_cli")
+        .version("1.0.0")
+        .about("DevConsole CLI ツール")
+        .arg(
+            Arg::new("server")
+                .short('s')
+                .long("server")
+                .value_name("ADDRESS")
+                .help("DevConsole サーバーのアドレス")
+                .default_value("ws://127.0.0.1:9001"),
+        )
+        .arg(
+            Arg::new("verbose")
+                .short('v')
+                .long("verbose")
+                .help("Node ID を表示")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .subcommand(
+            Command::new("listen")
+                .about("指定したチャンネルを監視し、受信したメッセージを表示")
+                .arg(
+                    Arg::new("channel")
+                        .help("チャンネル名またはID")
+                        .required(true)
+                        .index(1),
+                ),
+        )
+        .subcommand(
+            Command::new("send")
+                .about("指定したチャンネルにメッセージを送信")
+                .arg(
+                    Arg::new("channel")
+                        .help("チャンネル名またはID")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::new("message")
+                        .help("送信するメッセージ")
+                        .required(true)
+                        .index(2),
+                ),
+        )
+        .subcommand(
+            Command::new("list")
+                .about("利用可能なチャンネル一覧を表示"),
+        )
+        .subcommand(
+            Command::new("open")
+                .about("指定した名前でチャンネルを開く")
+                .arg(
+                    Arg::new("name")
+                        .help("チャンネル名")
+                        .required(true)
+                        .index(1),
+                ),
+        )
+        .subcommand(
+            Command::new("info")
+                .about("指定したチャンネルの情報を表示")
+                .arg(
+                    Arg::new("channel")
+                        .help("チャンネル名またはID")
+                        .required(true)
+                        .index(1),
+                ),
+        )
+        .get_matches();
+
+    let server_addr = matches.get_one::<String>("server").unwrap();
+
+    let mut client = match DCClient::new(server_addr).await {
+        Ok(client) => client,
+        Err(e) => {
+            error!("サーバーへの接続に失敗しました: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    // Wait a bit to receive NodeID notification
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    if matches.get_flag("verbose") {
+        if let Some(node_id) = client.get_node_id().await {
+            println!("Node ID: {node_id}");
+        } else {
+            println!("Node ID: 取得中...");
+        }
+    }
+
+    match matches.subcommand() {
+        Some(("listen", sub_matches)) => {
+            if let Err(e) = handle_listen(&mut client, sub_matches).await {
+                error!("Listen コマンドでエラーが発生しました: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(("send", sub_matches)) => {
+            if let Err(e) = handle_send(&mut client, sub_matches).await {
+                error!("Send コマンドでエラーが発生しました: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(("list", _)) => {
+            if let Err(e) = handle_list(&mut client).await {
+                error!("List コマンドでエラーが発生しました: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(("open", sub_matches)) => {
+            if let Err(e) = handle_open(&mut client, sub_matches).await {
+                error!("Open コマンドでエラーが発生しました: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(("info", sub_matches)) => {
+            if let Err(e) = handle_info(&mut client, sub_matches).await {
+                error!("Info コマンドでエラーが発生しました: {e}");
+                std::process::exit(1);
+            }
+        }
+        _ => {
+            println!("コマンドを指定してください。--help でヘルプを表示します。");
+        }
+    }
+}
+
+async fn resolve_channel_id(client: &mut DCClient, channel_input: &str) -> Result<ChannelID, String> {
+    // Try to parse as numeric ID first
+    if let Ok(channel_id) = channel_input.parse::<ChannelID>() {
+        return Ok(channel_id);
+    }
+
+    // If not numeric, search by name
+    let channels = match client.channel_list().await {
+        Ok(channels) => channels,
+        Err(e) => return Err(format!("チャンネル一覧の取得に失敗しました: {e}")),
+    };
+
+    for &channel_id in &channels {
+        match client.channel_info(channel_id).await {
+            Ok(info) => {
+                if info.name == channel_input {
+                    return Ok(channel_id);
+                }
+            }
+            Err(_) => continue, // Skip channels we can't get info for
+        }
+    }
+
+    Err(format!("チャンネル '{channel_input}' が見つかりません"))
+}
+
+async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
+    let channel_input = matches.get_one::<String>("channel").unwrap();
+    let channel_id = resolve_channel_id(client, channel_input).await?;
+
+    let (tx, mut rx) = mpsc::channel::<(ChannelID, String)>(64);
+
+    client.listen(channel_id, tx).await
+        .map_err(|e| format!("チャンネルの監視に失敗しました: {e}"))?;
+
+    println!("チャンネル {channel_id} を監視しています。Ctrl+C で終了します。");
+
+    while let Some((channel, data)) = rx.recv().await {
+        println!("{channel}: {data}");
+        io::stdout().flush().unwrap();
+    }
+
+    Ok(())
+}
+
+async fn handle_send(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
+    let channel_input = matches.get_one::<String>("channel").unwrap();
+    let message = matches.get_one::<String>("message").unwrap();
+
+    let channel_id = resolve_channel_id(client, channel_input).await?;
+
+    client.send(channel_id, message.clone()).await
+        .map_err(|e| format!("メッセージの送信に失敗しました: {e}"))?;
+
+    println!("チャンネル {channel_id} にメッセージを送信しました: {message}");
+
+    Ok(())
+}
+
+async fn handle_list(client: &mut DCClient) -> Result<(), String> {
+    let channels = client.channel_list().await
+        .map_err(|e| format!("チャンネル一覧の取得に失敗しました: {e}"))?;
+
+    if channels.is_empty() {
+        println!("利用可能なチャンネルはありません。");
+        return Ok(());
+    }
+
+    println!("利用可能なチャンネル:");
+    for &channel_id in &channels {
+        match client.channel_info(channel_id).await {
+            Ok(info) => {
+                println!("  ID: {}, 名前: {}, 提供者: {}", info.channel, info.name, info.supplied_by);
+            }
+            Err(_) => {
+                println!("  ID: {channel_id} (情報取得エラー)");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_open(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
+    let name = matches.get_one::<String>("name").unwrap();
+
+    let channel_id = client.open(name.clone()).await
+        .map_err(|e| format!("チャンネルの作成に失敗しました: {e}"))?;
+
+    println!("チャンネルを開きました - ID: {channel_id}, 名前: {name}");
+
+    Ok(())
+}
+
+async fn handle_info(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
+    let channel_input = matches.get_one::<String>("channel").unwrap();
+    let channel_id = resolve_channel_id(client, channel_input).await?;
+
+    let info = client.channel_info(channel_id).await
+        .map_err(|e| format!("チャンネル情報の取得に失敗しました: {e}"))?;
+
+    println!("チャンネル情報:");
+    println!("  ID: {}", info.channel);
+    println!("  名前: {}", info.name);
+    println!("  提供者: {}", info.supplied_by);
+
+    Ok(())
+}
