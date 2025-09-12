@@ -9,6 +9,8 @@ members = [
     "devconsole_serial_protocol",
     "devconsole_serial_logger",
     "devconsole_cli",
+
+    "dc_pktuart",
 ]
 
 [patch.crates-io]
