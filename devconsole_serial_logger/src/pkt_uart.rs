@@ -42,7 +42,12 @@ impl PktUARTRx {
         let _rd16 = self.read_u16().await?;
 
         let mut buf = Vec::with_capacity(len as usize);
-        self.rx.recv_many(&mut buf, len as usize).await;
+        let mut read_len = 0;
+        while read_len < len {
+            let b = self.rx.recv().await?;
+            buf.push(b);
+            read_len += 1;
+        }
 
         Some((dest_address, buf))
     }
