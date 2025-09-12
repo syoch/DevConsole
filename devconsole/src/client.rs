@@ -44,6 +44,9 @@ impl From<&Event> for DispatchID {
             Event::Data { channel, .. } => {
                 panic!("Data event should not be dispatched: {channel:?}")
             }
+            Event::DataBin { channel, .. } => {
+                panic!("DataBin event should not be dispatched: {channel:?}")
+            }
 
             Event::NodeIDNotification { node_id: _ }
             | Event::ChannelOpenRequest { name: _ }
@@ -63,6 +66,7 @@ struct Dispatchers {
     channel_list: Option<oneshot::Sender<Vec<ChannelID>>>,
     channel_info: Option<oneshot::Sender<ChannelInfo>>,
     data_handlers: HashMap<ChannelID, mpsc::Sender<(ChannelID, String)>>,
+    bin_data_handlers: HashMap<ChannelID, mpsc::Sender<(ChannelID, Vec<u8>)>>,
     node_id: Option<NodeID>,
 }
 
@@ -173,6 +177,22 @@ impl SharedDispatchers {
         }
     }
 
+    pub async fn register_bin_data_handler(
+        &self,
+        channel: ChannelID,
+        handler: mpsc::Sender<(ChannelID, Vec<u8>)>,
+    ) {
+        self.lock().await.bin_data_handlers.insert(channel, handler);
+    }
+
+    pub async fn dispatch_bin_data(&self, channel: ChannelID, data: Vec<u8>) {
+        if let Some(handler) = self.lock().await.bin_data_handlers.get(&channel) {
+            let _ = handler.send((channel, data)).await;
+        } else {
+            warn!("No binary data handler found for channel: {channel}");
+        }
+    }
+
     pub async fn set_node_id(&self, node_id: NodeID) {
         self.lock().await.node_id = Some(node_id);
     }
@@ -234,6 +254,7 @@ impl DCClient {
         &mut self,
         channel: ChannelID,
         channel_tx: mpsc::Sender<(ChannelID, String)>,
+        channel_bin_tx: Option<mpsc::Sender<(ChannelID, Vec<u8>)>>,
     ) -> Result<(), DCClientError> {
         if self.listening_channels.contains(&channel) {
             warn!("Channel {channel} is already being listened to");
@@ -249,6 +270,12 @@ impl DCClient {
             .register_data_handler(channel, channel_tx)
             .await;
 
+        if let Some(bin_tx) = channel_bin_tx {
+            self.dispatches
+                .register_bin_data_handler(channel, bin_tx)
+                .await;
+        }
+
         let response = self
             .dispatches
             .wait_for_event(DispatchID::Listen(channel))
@@ -263,6 +290,12 @@ impl DCClient {
 
     pub async fn send(&mut self, channel: ChannelID, data: String) -> Result<(), DCClientError> {
         self.send_evt(Event::Data { channel, data })
+            .await
+            .map_err(DCClientError::WSError)
+    }
+
+    pub async fn send_bin(&mut self, channel: ChannelID, data: Vec<u8>) -> Result<(), DCClientError> {
+        self.send_evt(Event::DataBin { channel, data })
             .await
             .map_err(DCClientError::WSError)
     }
@@ -321,6 +354,9 @@ impl DCClient {
                     }
                     Event::Data { channel, data } => {
                         dispatchers.dispatch_data(channel, data).await;
+                    }
+                    Event::DataBin { channel, data } => {
+                        dispatchers.dispatch_bin_data(channel, data).await;
                     }
                     Event::ChannelOpenResponse {
                         channel,

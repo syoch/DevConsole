@@ -19,6 +19,7 @@ pub enum Event {
     NodeIDNotification { node_id: NodeID },
 
     Data { channel: ChannelID, data: String },
+    DataBin { channel: ChannelID, data: Vec<u8> },
 
     ChannelOpenRequest { name: String },
     ChannelOpenResponse { channel: ChannelID, success: bool },

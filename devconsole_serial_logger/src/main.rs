@@ -116,7 +116,7 @@ pub async fn main() {
         .expect("Failed to get SerialMonitor channel ID");
 
     client
-        .listen(serial_monitor_cid, tx)
+        .listen(serial_monitor_cid, tx, None)
         .await
         .expect("Failed to listen to SerialMonitor channel");
 

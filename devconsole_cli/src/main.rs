@@ -1,8 +1,8 @@
 use clap::{Arg, ArgMatches, Command};
-use devconsole::{DCClient, ChannelID};
+use devconsole::{ChannelID, DCClient};
 use log::error;
 use std::io::{self, Write};
-use tokio::sync::mpsc;
+use tokio::{select, sync::mpsc};
 
 #[tokio::main]
 pub async fn main() {
@@ -57,10 +57,7 @@ pub async fn main() {
                         .index(2),
                 ),
         )
-        .subcommand(
-            Command::new("list")
-                .about("利用可能なチャンネル一覧を表示"),
-        )
+        .subcommand(Command::new("list").about("利用可能なチャンネル一覧を表示"))
         .subcommand(
             Command::new("open")
                 .about("指定した名前でチャンネルを開く")
@@ -141,7 +138,10 @@ pub async fn main() {
     }
 }
 
-async fn resolve_channel_id(client: &mut DCClient, channel_input: &str) -> Result<ChannelID, String> {
+async fn resolve_channel_id(
+    client: &mut DCClient,
+    channel_input: &str,
+) -> Result<ChannelID, String> {
     // Try to parse as numeric ID first
     if let Ok(channel_id) = channel_input.parse::<ChannelID>() {
         return Ok(channel_id);
@@ -172,15 +172,41 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
     let channel_id = resolve_channel_id(client, channel_input).await?;
 
     let (tx, mut rx) = mpsc::channel::<(ChannelID, String)>(64);
-
-    client.listen(channel_id, tx).await
+    let (tx_bin, mut rx_bin) = mpsc::channel::<(ChannelID, Vec<u8>)>(64);
+    client
+        .listen(channel_id, tx, Some(tx_bin))
+        .await
         .map_err(|e| format!("チャンネルの監視に失敗しました: {e}"))?;
 
     println!("チャンネル {channel_id} を監視しています。Ctrl+C で終了します。");
+    loop {
+        select! {
+            Some((_, message)) = rx.recv() => {
+                println!("{message}");
+                io::stdout().flush().ok();
+            }
+            Some((_, data)) = rx_bin.recv() => {
+                let mut s = String::new();
+                for &b in &data {
+                    match b {
+                        b'\x1b' => s.push_str(r"\e"),
+                        b'\n' => s.push_str(r"\n"),
+                        b'\r' => s.push_str(r"\r"),
+                        b'\t' => s.push_str(r"\t"),
+                        b'\0' => s.push_str(r"\0"),
+                        0x20..=0x7e => s.push(b as char),
+                        _ => s.push_str(&format!(r"\x{:02X}", b)),
+                    }
+                }
 
-    while let Some((channel, data)) = rx.recv().await {
-        println!("{channel}: {data}");
-        io::stdout().flush().unwrap();
+                println!("b'{s}'");
+                io::stdout().flush().ok();
+            }
+            else => {
+                // Both channels closed
+                break;
+            }
+        }
     }
 
     Ok(())
@@ -192,7 +218,9 @@ async fn handle_send(client: &mut DCClient, matches: &ArgMatches) -> Result<(), 
 
     let channel_id = resolve_channel_id(client, channel_input).await?;
 
-    client.send(channel_id, message.clone()).await
+    client
+        .send(channel_id, message.clone())
+        .await
         .map_err(|e| format!("メッセージの送信に失敗しました: {e}"))?;
 
     println!("チャンネル {channel_id} にメッセージを送信しました: {message}");
@@ -201,7 +229,9 @@ async fn handle_send(client: &mut DCClient, matches: &ArgMatches) -> Result<(), 
 }
 
 async fn handle_list(client: &mut DCClient) -> Result<(), String> {
-    let channels = client.channel_list().await
+    let channels = client
+        .channel_list()
+        .await
         .map_err(|e| format!("チャンネル一覧の取得に失敗しました: {e}"))?;
 
     if channels.is_empty() {
@@ -213,7 +243,10 @@ async fn handle_list(client: &mut DCClient) -> Result<(), String> {
     for &channel_id in &channels {
         match client.channel_info(channel_id).await {
             Ok(info) => {
-                println!("  ID: {}, 名前: {}, 提供者: {}", info.channel, info.name, info.supplied_by);
+                println!(
+                    "  ID: {}, 名前: {}, 提供者: {}",
+                    info.channel, info.name, info.supplied_by
+                );
             }
             Err(_) => {
                 println!("  ID: {channel_id} (情報取得エラー)");
@@ -227,7 +260,9 @@ async fn handle_list(client: &mut DCClient) -> Result<(), String> {
 async fn handle_open(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
     let name = matches.get_one::<String>("name").unwrap();
 
-    let channel_id = client.open(name.clone()).await
+    let channel_id = client
+        .open(name.clone())
+        .await
         .map_err(|e| format!("チャンネルの作成に失敗しました: {e}"))?;
 
     println!("チャンネルを開きました - ID: {channel_id}, 名前: {name}");
@@ -239,7 +274,9 @@ async fn handle_info(client: &mut DCClient, matches: &ArgMatches) -> Result<(), 
     let channel_input = matches.get_one::<String>("channel").unwrap();
     let channel_id = resolve_channel_id(client, channel_input).await?;
 
-    let info = client.channel_info(channel_id).await
+    let info = client
+        .channel_info(channel_id)
+        .await
         .map_err(|e| format!("チャンネル情報の取得に失敗しました: {e}"))?;
 
     println!("チャンネル情報:");

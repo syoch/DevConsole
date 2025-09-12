@@ -49,6 +49,17 @@ impl SharedServer {
         }
     }
 
+    pub async fn broadcast_bin_data(&self, channel: ChannelID, data: Vec<u8>) {
+        for client in &self.0.lock().await.connections {
+            if client.is_listening(channel).await {
+                let event = Event::DataBin {
+                    channel,
+                    data: data.clone(),
+                };
+                client.send_event(event).await.unwrap();
+            }
+        }
+    }
     pub async fn add_connection(&self, client: SharedClient) {
         self.0.lock().await.connections.push(client);
     }

@@ -166,8 +166,7 @@ async fn monitor(client: &mut DCClient, channel: ChannelID, mut data_rx: Receive
                         client.send(channel, payload).await.unwrap();
 
                         if let Some(cid) = vports.get(&path) {
-                            let payload = serde_json::to_string(&line).unwrap();
-                            client.send(*cid, payload).await.unwrap();
+                            client.send_bin(*cid, line).await.unwrap();
                         }
                     }
                     Some(serial_monitor::Event::Closed(path)) => {
@@ -227,12 +226,12 @@ pub async fn main() {
 
     let (outbound_tx, outbound_rx) = mpsc::channel(64);
     client
-        .listen(outbound_cid, outbound_tx)
+        .listen(outbound_cid, outbound_tx, None)
         .await
         .expect("Failed to listen");
     let (req_tx, req_rx) = mpsc::channel(64);
     spawn(outbound_transformer(outbound_rx, req_tx));
 
     info!("Starting serial_monitor...");
-    monitor(&mut client, channel, req_rx).await;
+    monitor(&mut client, channel, req_rx).await.unwrap();
 }

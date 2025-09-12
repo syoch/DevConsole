@@ -27,7 +27,7 @@ pub async fn main() {
         let channel_list = client.channel_list().await.unwrap();
         for channel in channel_list {
             if !listening_channels.contains(&channel) {
-                client.listen(channel, tx.clone()).await.unwrap();
+                client.listen(channel, tx.clone(), None).await.unwrap();
                 listening_channels.push(channel);
             }
         }

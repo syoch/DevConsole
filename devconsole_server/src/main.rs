@@ -56,6 +56,9 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
                 Event::Data { channel, data } => {
                     server.broadcast_data(channel, data).await;
                 }
+                Event::DataBin { channel, data } => {
+                    server.broadcast_bin_data(channel, data).await;
+                }
                 Event::ChannelOpenRequest { name } => {
                     let channel = server.new_channel(name, node_id).await;
                     client
