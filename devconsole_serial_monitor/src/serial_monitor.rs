@@ -50,7 +50,7 @@ pub async fn monitor_thread(
             val = req_rx.recv() => {
                 match val {
                     Some(RequestToDevice::Data(data)) => {
-                        info!("Writing data to {}: {:?}", path2, data);
+                        info!("Writing data to {path2}: {data:?}");
                         td.write(&data)
                             .expect("Failed to write data to serial device");
                         should_continue_loop  =true

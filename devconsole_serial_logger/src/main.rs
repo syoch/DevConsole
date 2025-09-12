@@ -47,7 +47,7 @@ impl DeviceHandler {
             let (dest_addr, data) = rx.read_pkt().await.expect("Failed to read packet");
 
             // Show
-            debug!("Received packet: dest_addr={}, data={:?}", dest_addr, data);
+            debug!("Received packet: {dest_addr}, data={data:?}");
         }
     }
 }
@@ -88,6 +88,9 @@ impl Handler {
 pub async fn main() {
     logger::Builder::new()
         .filter(None, log::LevelFilter::Debug)
+        .format_timestamp(None)
+        .format_module_path(false)
+        .format_target(false)
         .init();
 
     let mut client = DCClient::new("ws://127.0.0.1:9001").await.unwrap();

@@ -8,7 +8,7 @@ mod server;
 
 use devconsole::{ChannelInfo, Event};
 use futures_util::StreamExt;
-use log::{debug, error, info};
+use log::{error, info};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::accept_async;
 
@@ -50,7 +50,7 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
         if msg.is_binary() || msg.is_text() {
             let msg = msg.to_text().unwrap();
             let evt = serde_json::from_str::<Event>(msg).unwrap();
-            debug!("Received message: {evt:?}");
+            // debug!("Received message: {evt:?}");
 
             match evt {
                 Event::Data { channel, data } => {

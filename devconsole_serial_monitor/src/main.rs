@@ -51,26 +51,20 @@ impl RequestMuxer {
         loop {
             select! (
                 request = ctrl_req_rx.recv() => {
-                    match request {
-                        Some(MuxerRequest::NewPair(path)) => {
-                            let (tx, rx) = mpsc::channel(64);
-                            rxs.insert(path.clone(), tx);
-                            ctrl_res_tx.send(MuxerResponse::NewPair(path, rx)).await.expect("Failed to send new pair response");
-                        }
-                        _ => {}
+                    if let Some(MuxerRequest::NewPair(path)) = request  {
+                        let (tx, rx) = mpsc::channel(64);
+                        rxs.insert(path.clone(), tx);
+                        ctrl_res_tx.send(MuxerResponse::NewPair(path, rx)).await.expect("Failed to send new pair response");
                     }
                 }
                 request = data_rx.recv() => {
-                    match request {
-                        Some(SerialRequest::Data { path, data }) => {
-                            if let Some(tx) = rxs.get(&path) {
-                                tx.send(serial_monitor::RequestToDevice::Data(data))
-                                    .await.expect("Failed to send data to device");
-                            } else {
-                                warn!("No TX found for path: {}", path);
-                            }
+                    if let Some(SerialRequest::Data { path, data }) = request {
+                        if let Some(tx) = rxs.get(&path) {
+                            tx.send(serial_monitor::RequestToDevice::Data(data))
+                                .await.expect("Failed to send data to device");
+                        } else {
+                            warn!("No TX found for path: {path}");
                         }
-                        _ => {}
                     }
                 }
             )
@@ -148,7 +142,7 @@ async fn monitor(event_tx: Sender<SerialEvent>, mut data_rx: Receiver<SerialRequ
                         event_tx
                             .send(SerialEvent::Line {
                                 path,
-                                line: line,
+                                line,
                             })
                             .await.expect("Failed to send line event");
                     }
