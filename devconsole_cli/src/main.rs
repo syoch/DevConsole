@@ -174,7 +174,7 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
     let (tx, mut rx) = mpsc::channel::<(ChannelID, String)>(64);
     let (tx_bin, mut rx_bin) = mpsc::channel::<(ChannelID, Vec<u8>)>(64);
     client
-        .listen(channel_id, tx, Some(tx_bin))
+        .listen(channel_id, Some(tx), Some(tx_bin))
         .await
         .map_err(|e| format!("チャンネルの監視に失敗しました: {e}"))?;
 

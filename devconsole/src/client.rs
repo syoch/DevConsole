@@ -253,7 +253,7 @@ impl DCClient {
     pub async fn listen(
         &mut self,
         channel: ChannelID,
-        channel_tx: mpsc::Sender<(ChannelID, String)>,
+        channel_tx: Option<mpsc::Sender<(ChannelID, String)>>,
         channel_bin_tx: Option<mpsc::Sender<(ChannelID, Vec<u8>)>>,
     ) -> Result<(), DCClientError> {
         if self.listening_channels.contains(&channel) {
@@ -266,9 +266,9 @@ impl DCClient {
             .await
             .map_err(DCClientError::WSError)?;
 
-        self.dispatches
-            .register_data_handler(channel, channel_tx)
-            .await;
+        if let Some(tx) = channel_tx {
+            self.dispatches.register_data_handler(channel, tx).await;
+        }
 
         if let Some(bin_tx) = channel_bin_tx {
             self.dispatches
@@ -294,7 +294,11 @@ impl DCClient {
             .map_err(DCClientError::WSError)
     }
 
-    pub async fn send_bin(&mut self, channel: ChannelID, data: Vec<u8>) -> Result<(), DCClientError> {
+    pub async fn send_bin(
+        &mut self,
+        channel: ChannelID,
+        data: Vec<u8>,
+    ) -> Result<(), DCClientError> {
         self.send_evt(Event::DataBin { channel, data })
             .await
             .map_err(DCClientError::WSError)

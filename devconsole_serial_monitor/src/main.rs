@@ -226,7 +226,7 @@ pub async fn main() {
 
     let (outbound_tx, outbound_rx) = mpsc::channel(64);
     client
-        .listen(outbound_cid, outbound_tx, None)
+        .listen(outbound_cid, Some(outbound_tx), None)
         .await
         .expect("Failed to listen");
     let (req_tx, req_rx) = mpsc::channel(64);
