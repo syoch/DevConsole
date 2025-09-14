@@ -13,9 +13,12 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
 };
 
+#[derive(Debug)]
 enum MuxerRequest {
     NewPair(String),
 }
+
+#[derive(Debug)]
 enum MuxerResponse {
     NewPair(String, Receiver<serial_monitor::RequestToDevice>),
 }
@@ -51,13 +54,21 @@ impl RequestMuxer {
         loop {
             select! (
                 request = ctrl_req_rx.recv() => {
-                    if let Some(MuxerRequest::NewPair(path)) = request  {
-                        let (tx, rx) = mpsc::channel(64);
-                        rxs.insert(path.clone(), tx);
-                        ctrl_res_tx.send(MuxerResponse::NewPair(path, rx)).await.expect("Failed to send new pair response");
+                    debug!("Received control request: {:?}", request);
+                    match request {
+                        Some(MuxerRequest::NewPair(path)) => {
+                            let (tx, rx) = mpsc::channel(64);
+                            rxs.insert(path.clone(), tx);
+                            ctrl_res_tx.send(MuxerResponse::NewPair(path, rx)).await.expect("Failed to send new pair response");
+                        },
+                        None => {
+                            error!("Error receiving control request");
+                            break;
+                        }
                     }
                 }
                 request = data_rx.recv() => {
+                    debug!("Received data request: {:?}", request);
                     match request {
                         Some(SerialRequest::Data { path, data }) => {
                             if let Some(tx) = rxs.get(&path) {
@@ -97,18 +108,40 @@ impl RequestMuxer {
     }
 }
 
-async fn monitor(client: &mut DCClient, channel: ChannelID, mut data_rx: Receiver<SerialRequest>)
--> Result<(), Box<dyn std::error::Error>>
- {
+async fn monitor(
+    client: &mut DCClient,
+    channel: ChannelID,
+    mut data_rx: Receiver<SerialRequest>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (dev_tx, mut dev_rx) = mpsc::channel(64);
     let (serial_tx, mut serial_rx) = mpsc::channel(64);
+    let (data_inner_tx, mut data_inner_rx) = mpsc::channel(64);
     spawn(device_watcher::watcher_thread(dev_tx));
 
     let mut req_muxer = RequestMuxer::new();
-    let mut vports = HashMap::new();
+    let mut vports: HashMap<String, u64> = HashMap::new();
 
     loop {
         select! {
+            data = data_inner_rx.recv() => {
+                match data {
+                    Some((cid, data)) => {
+                        let path = vports.iter().
+                            find_map(|(k, v)| if *v == cid { Some(k.clone()) } else { None }).
+                            expect("Failed to find path for cid");
+
+                        req_muxer
+                            .data_tx
+                            .send(SerialRequest::Data { path, data })
+                            .await.expect("Failed to send data to muxer");
+                    }
+                    None => {
+                        error!("Error receiving message from inner data channel");
+                        break;
+                    }
+                }
+            }
+
             msg = data_rx.recv() => {
                 match msg {
                     Some(SerialRequest::Data { path, data }) => {
@@ -120,6 +153,7 @@ async fn monitor(client: &mut DCClient, channel: ChannelID, mut data_rx: Receive
                     Some(SerialRequest::OpenVPort { path, channel_name }) => {
                         if !vports.contains_key(&path) {
                             let cid = client.open(channel_name).await?;
+                            client.listen(cid, None, Some(data_inner_tx.clone())).await?;
                             vports.insert(path.clone(), cid);
                         }
                     }
@@ -219,14 +253,9 @@ pub async fn main() {
         .await
         .expect("Failed to open channel");
 
-    let outbound_cid = client
-        .open("SerialMonitor-Outbound".to_string())
-        .await
-        .expect("Failed to open channel");
-
     let (outbound_tx, outbound_rx) = mpsc::channel(64);
     client
-        .listen(outbound_cid, Some(outbound_tx), None)
+        .listen(channel, Some(outbound_tx.clone()), None)
         .await
         .expect("Failed to listen");
     let (req_tx, req_rx) = mpsc::channel(64);
