@@ -3,7 +3,6 @@ extern crate log;
 
 mod pkt_uart;
 
-use std::collections::HashMap;
 
 use devconsole::{ChannelID, DCClient};
 use devconsole_serial_protocol::SerialEvent;
@@ -45,9 +44,9 @@ impl DCTxPort {
         }
     }
 
-    pub fn to_mpsc(self) -> mpsc::Sender<Vec<u8>> {
+    pub fn to_mpsc(&self) -> mpsc::Sender<Vec<u8>> {
         let (tx, mut rx) = mpsc::channel(100);
-        let tx_dc = self.tx;
+        let tx_dc = self.tx.clone();
         let dst = self.channel_id;
         spawn(async move {
             while let Some(data) = rx.recv().await {

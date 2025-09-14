@@ -202,7 +202,7 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
                         b'\t' => s.push_str(r"\t"),
                         b'\0' => s.push_str(r"\0"),
                         0x20..=0x7e => s.push(b as char),
-                        _ => s.push_str(&format!(r"\x{:02X}", b)),
+                        _ => s.push_str(&format!(r"\x{b:02X}")),
                     }
                 }
 

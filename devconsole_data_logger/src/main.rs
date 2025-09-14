@@ -14,7 +14,7 @@ fn escape(data: Vec<u8>) -> String {
             b'\n' => escaped.push_str("\\n"),
             b'\r' => escaped.push_str("\\r"),
             b'\t' => escaped.push_str("\\t"),
-            _ => escaped.push_str(&format!("\\x{:02x}", b)),
+            _ => escaped.push_str(&format!("\\x{b:02x}")),
         }
     }
     escaped

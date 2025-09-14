@@ -1,4 +1,3 @@
-use log::debug;
 use tokio::sync::mpsc;
 
 // RD16: パケットのチェックサム計算用構造体
@@ -10,10 +9,6 @@ pub struct RD16 {
 impl RD16 {
     pub fn new() -> Self {
         Self { current: 36683 }
-    }
-
-    pub fn reset(&mut self) {
-        self.current = 36683;
     }
 
     pub fn update(&mut self, x: u8) {
@@ -33,18 +28,8 @@ impl RD16 {
         rd16
     }
 
-    pub fn copy_and_append<T: AsRef<[u8]>>(&self, data: T) -> Self {
-        let mut rd16 = *self;
-        rd16.update_slice(data);
-        rd16
-    }
-
     pub fn get(&self) -> u16 {
         self.current
-    }
-
-    pub fn set(&mut self, x: u16) {
-        self.current = x;
     }
 }
 
@@ -111,11 +96,10 @@ impl PktUARTTx {
     }
 
     pub async fn send(&self, addr: u8, data: Vec<u8>) {
-        let mut packet = Vec::new();
-        packet.push(0x55);
-        packet.push(0xaa);
-        packet.push(0x5a);
-        packet.push(addr);
+        let mut packet = vec![
+            0x55, 0xaa, 0x5a, // Header
+            addr, // Destination Address
+        ];
 
         let len = data.len() as u16;
         packet.extend_from_slice(&len.to_be_bytes());
