@@ -1,3 +1,4 @@
+use log::debug;
 use tokio::sync::mpsc;
 
 // RD16: パケットのチェックサム計算用構造体
@@ -101,32 +102,29 @@ impl PktUARTRx {
 }
 
 pub struct PktUARTTx {
-    tx: mpsc::Sender<u8>,
+    tx: mpsc::Sender<Vec<u8>>,
 }
 
 impl PktUARTTx {
-    pub fn new(tx: mpsc::Sender<u8>) -> Self {
+    pub fn new(tx: mpsc::Sender<Vec<u8>>) -> Self {
         Self { tx }
     }
 
-    async fn send_u16(&self, x: u16) {
-        let bytes = x.to_be_bytes();
-        self.tx.send(bytes[0]).await.unwrap();
-        self.tx.send(bytes[1]).await.unwrap();
-    }
-
     pub async fn send(&self, addr: u8, data: Vec<u8>) {
-        self.tx.send(0x55).await.unwrap();
-        self.tx.send(0xaa).await.unwrap();
-        self.tx.send(0x5a).await.unwrap();
-        self.tx.send(addr).await.unwrap();
-        self.send_u16(data.len() as u16).await;
+        let mut packet = Vec::new();
+        packet.push(0x55);
+        packet.push(0xaa);
+        packet.push(0x5a);
+        packet.push(addr);
 
-        let rd16 = RD16::from_data(&[addr]).copy_and_append(&data);
-        self.send_u16(rd16.get()).await;
+        let len = data.len() as u16;
+        packet.extend_from_slice(&len.to_be_bytes());
 
-        for &b in &data {
-            self.tx.send(b).await.unwrap();
-        }
+        let rd16 = RD16::from_data(&data);
+        packet.extend_from_slice(&rd16.get().to_be_bytes());
+
+        packet.extend_from_slice(&data);
+
+        self.tx.send(packet).await.unwrap();
     }
 }
