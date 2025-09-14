@@ -45,6 +45,13 @@ pub async fn main() {
             Command::new("send")
                 .about("指定したチャンネルにメッセージを送信")
                 .arg(
+                    Arg::new("binary")
+                        .short('b')
+                        .help("バイナリモードで送信")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
                     Arg::new("channel")
                         .help("チャンネル名またはID")
                         .required(true)
@@ -212,16 +219,70 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
     Ok(())
 }
 
+fn intercept_escape_sequences(input: &str) -> Vec<u8> {
+    let mut output = Vec::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            output.push(c as u8);
+            continue;
+        }
+        let next_char = match chars.next() {
+            Some(nc) => nc,
+            None => {
+                output.push(b'\\');
+                break;
+            }
+        };
+        match next_char {
+            'n' => output.push(b'\n'),
+            'r' => output.push(b'\r'),
+            't' => output.push(b'\t'),
+            'e' => output.push(b'\x1b'),
+            '0' => output.push(b'\0'),
+            'x' => {
+                let hex1 = chars.next();
+                let hex2 = chars.next();
+                if let (Some(h1), Some(h2)) = (hex1, hex2) {
+                    if let (Some(d1), Some(d2)) = (h1.to_digit(16), h2.to_digit(16)) {
+                        output.push(((d1 << 4) | d2) as u8 );
+                    } else {
+                        output.push(b'\\');
+                        output.push(b'x');
+                        output.push(h1 as u8);
+                        output.push(h2 as u8);
+                    }
+                }
+            }
+            _ => {
+                output.push(b'\\');
+                output.push(next_char as u8);
+            }
+        }
+    }
+
+    output
+}
+
 async fn handle_send(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
     let channel_input = matches.get_one::<String>("channel").unwrap();
     let message = matches.get_one::<String>("message").unwrap();
+    let is_binary = matches.get_flag("binary");
 
     let channel_id = resolve_channel_id(client, channel_input).await?;
 
-    client
-        .send(channel_id, message.clone())
-        .await
-        .map_err(|e| format!("メッセージの送信に失敗しました: {e}"))?;
+    if is_binary {
+        client
+            .send_bin(channel_id, intercept_escape_sequences(message))
+            .await
+            .map_err(|e| format!("メッセージの送信に失敗しました: {e}"))?;
+    } else {
+        client
+            .send(channel_id, message.clone())
+            .await
+            .map_err(|e| format!("メッセージの送信に失敗しました: {e}"))?;
+    }
 
     println!("チャンネル {channel_id} にメッセージを送信しました: {message}");
 
