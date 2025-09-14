@@ -37,8 +37,11 @@ impl SharedServer {
         cid
     }
 
-    pub async fn broadcast_data(&self, channel: ChannelID, data: String) {
+    pub async fn broadcast_data(&self, channel: ChannelID, data: String, from: NodeID) {
         for client in &self.0.lock().await.connections {
+            if client.node_id().await == from {
+                continue;
+            }
             if client.is_listening(channel).await {
                 let event = Event::Data {
                     channel,
@@ -49,8 +52,11 @@ impl SharedServer {
         }
     }
 
-    pub async fn broadcast_bin_data(&self, channel: ChannelID, data: Vec<u8>) {
+    pub async fn broadcast_bin_data(&self, channel: ChannelID, data: Vec<u8>, from: NodeID) {
         for client in &self.0.lock().await.connections {
+            if client.node_id().await == from {
+                continue;
+            }
             if client.is_listening(channel).await {
                 let event = Event::DataBin {
                     channel,

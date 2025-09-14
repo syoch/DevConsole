@@ -46,7 +46,6 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
             }
         };
 
-        // We do not want to send back ping/pong messages.
         if msg.is_binary() || msg.is_text() {
             let msg = msg.to_text().unwrap();
             let evt = serde_json::from_str::<Event>(msg).unwrap();
@@ -54,10 +53,10 @@ async fn client_handler(stream: TcpStream, server: SharedServer) {
 
             match evt {
                 Event::Data { channel, data } => {
-                    server.broadcast_data(channel, data).await;
+                    server.broadcast_data(channel, data, client.node_id().await).await;
                 }
                 Event::DataBin { channel, data } => {
-                    server.broadcast_bin_data(channel, data).await;
+                    server.broadcast_bin_data(channel, data, client.node_id().await).await;
                 }
                 Event::ChannelOpenRequest { name } => {
                     let channel = server.new_channel(name, node_id).await;
