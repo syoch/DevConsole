@@ -240,7 +240,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "srobo_base",
+ "srobo_base 0.1.0",
  "tokio",
 ]
 
@@ -268,7 +268,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "srobo_base",
+ "srobo_base 0.1.0",
  "tokio",
 ]
 
@@ -281,7 +281,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "srobo_base",
+ "srobo_base 0.1.0",
  "tokio",
 ]
 
@@ -295,7 +295,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "srobo_base",
+ "srobo_base 0.1.0",
  "tokio",
 ]
 
@@ -309,7 +309,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "srobo_base",
+ "srobo_base 1.1.0",
  "tokio",
 ]
 
@@ -919,6 +919,16 @@ dependencies = [
 name = "srobo_base"
 version = "0.1.0"
 source = "git+https://github.com/nnctroboticsclub/srobo_base.git?rev=v1.0.6#e5b64f4865a49b24640f25b13b57e70c976df247"
+dependencies = [
+ "cbindgen",
+ "serialport",
+]
+
+[[package]]
+name = "srobo_base"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "737bc90efaeef6896ad5781dfa59a8d0e94cab70dcb076cea93fd763aa705735"
 dependencies = [
  "cbindgen",
  "serialport",

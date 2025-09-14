@@ -54,7 +54,6 @@ impl RequestMuxer {
         loop {
             select! (
                 request = ctrl_req_rx.recv() => {
-                    debug!("Received control request: {:?}", request);
                     match request {
                         Some(MuxerRequest::NewPair(path)) => {
                             let (tx, rx) = mpsc::channel(64);
@@ -68,7 +67,6 @@ impl RequestMuxer {
                     }
                 }
                 request = data_rx.recv() => {
-                    debug!("Received data request: {:?}", request);
                     match request {
                         Some(SerialRequest::Data { path, data }) => {
                             if let Some(tx) = rxs.get(&path) {

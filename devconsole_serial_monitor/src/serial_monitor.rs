@@ -21,7 +21,7 @@ pub async fn monitor_thread(
     tx: Sender<Event>,
     mut req_rx: Receiver<RequestToDevice>,
 ) {
-    let dev = SerialDevice::new(path.clone(), 961200);
+    let dev = SerialDevice::new(path.clone(), 921600);
     let (mut rd, mut td) = dev.open().expect("Failed to open serial device");
 
     let (live_t, mut live_r) = mpsc::channel(64);
@@ -50,7 +50,6 @@ pub async fn monitor_thread(
             val = req_rx.recv() => {
                 match val {
                     Some(RequestToDevice::Data(data)) => {
-                        info!("Writing data to {path2}: {data:?}");
                         td.write(&data)
                             .expect("Failed to write data to serial device");
                         should_continue_loop  =true
