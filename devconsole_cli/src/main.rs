@@ -39,6 +39,13 @@ pub async fn main() {
                         .help("チャンネル名またはID")
                         .required(true)
                         .index(1),
+                )
+                .arg(
+                    Arg::new("newline")
+                        .short('n')
+                        .help("メッセージの後に改行を追加")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue),
                 ),
         )
         .subcommand(
@@ -176,6 +183,7 @@ async fn resolve_channel_id(
 
 async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<(), String> {
     let channel_input = matches.get_one::<String>("channel").unwrap();
+    let newline = matches.get_one::<bool>("newline").unwrap();
     let channel_id = resolve_channel_id(client, channel_input).await?;
 
     let (tx, mut rx) = mpsc::channel::<(ChannelID, String)>(64);
@@ -189,7 +197,11 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
     loop {
         select! {
             Some((_, message)) = rx.recv() => {
-                println!("{message}");
+                if *newline {
+                    println!("{message}");
+                } else {
+                    print!("{message}");
+                }
                 io::stdout().flush().ok();
             }
             Some((_, data)) = rx_bin.recv() => {
@@ -197,7 +209,7 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
                 for &b in &data {
                     match b {
                         b'\x1b' => s.push_str(r"\e"),
-                        b'\n' => s.push_str(r"\n"),
+                        b'\n' => s.push_str("\n"),
                         b'\r' => s.push_str(r"\r"),
                         b'\t' => s.push_str(r"\t"),
                         b'\0' => s.push_str(r"\0"),
@@ -205,8 +217,11 @@ async fn handle_listen(client: &mut DCClient, matches: &ArgMatches) -> Result<()
                         _ => s.push_str(&format!(r"\x{b:02X}")),
                     }
                 }
+                if *newline {
+                    s.push('\n');
+                }
 
-                println!("b'{s}'");
+                print!("{s}");
                 io::stdout().flush().ok();
             }
             else => {
@@ -246,7 +261,7 @@ fn intercept_escape_sequences(input: &str) -> Vec<u8> {
                 let hex2 = chars.next();
                 if let (Some(h1), Some(h2)) = (hex1, hex2) {
                     if let (Some(d1), Some(d2)) = (h1.to_digit(16), h2.to_digit(16)) {
-                        output.push(((d1 << 4) | d2) as u8 );
+                        output.push(((d1 << 4) | d2) as u8);
                     } else {
                         output.push(b'\\');
                         output.push(b'x');
