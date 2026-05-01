@@ -1,6 +1,6 @@
 [package]
 name = "devconsole"
-version = "1.0.0"
+version = "1.0.1"
 license = "MIT"
 authors = ["syoch <syoch64@gmail.com>"]
 description = "DevConsole Library with client implementation"
